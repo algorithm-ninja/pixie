@@ -359,7 +359,7 @@
 <span class="attr">#[derive(Parser, Debug)]
 </span><span class="kw">pub struct </span>PixieOptions {
     <span class="doccomment">/// Directory in which files will be stored.
-    /// Must already contain files: tftpboot/uefi_app.efi, config.yaml
+    /// Must already contain files: tftpboot/pixie-uefi.efi, config.yaml
     </span><span class="attr">#[clap(short, long, default_value = <span class="string">"./storage"</span>)]
     </span>storage_dir: PathBuf,
 }
@@ -382,7 +382,7 @@
         <span class="string">"storage dir must be valid utf8"
     </span>);
 
-    <span class="kw">for </span>file_path <span class="kw">in </span>[[<span class="string">"tftpboot"</span>, <span class="string">"uefi_app.efi"</span>]] {
+    <span class="kw">for </span>file_path <span class="kw">in </span>[[<span class="string">"tftpboot"</span>, <span class="string">"pixie-uefi.efi"</span>]] {
         <span class="kw">let </span><span class="kw-2">mut </span>path = options.storage_dir.clone();
         <span class="kw">for </span>path_piece <span class="kw">in </span>file_path {
             path = path.join(path_piece);

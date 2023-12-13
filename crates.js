@@ -1,1 +1,1 @@
-window.ALL_CRATES = ["pixie_server","pixie_shared","pixie_web","uefi_app"];
+window.ALL_CRATES = ["pixie_server","pixie_shared","pixie_uefi","pixie_web"];
