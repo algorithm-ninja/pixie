@@ -123,43 +123,72 @@
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
-    collections::HashMap,
     fs::File,
-    io::{Error, Write},
-    net::{IpAddr, Ipv4Addr},
-    path::Path,
+    io::{BufWriter, Error, Write},
+    net::Ipv4Addr,
+    ops::Deref,
     process::{Child, Command},
-    time::Duration,
+    sync::Arc,
 };
 
-<span class="kw">use </span>anyhow::{bail, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span>anyhow::Result;
 
-<span class="kw">use </span>pixie_shared::{DhcpConfig, DhcpMode, Unit};
+<span class="kw">use </span>macaddr::MacAddr6;
+<span class="kw">use </span>pixie_shared::{DhcpMode, Unit};
 
-<span class="kw">pub struct </span>DnsmasqHandle {
+<span class="kw">use </span><span class="kw">crate</span>::state::State;
+
+<span class="kw">struct </span>DnsmasqHandle {
     child: Child,
-    hosts: File,
-    <span class="kw">pub </span>hostmap: HashMap&lt;Ipv4Addr, String&gt;,
 }
 
 <span class="kw">impl </span>DnsmasqHandle {
-    <span class="kw">pub fn </span>from_config(storage_dir: <span class="kw-2">&amp;</span>Path, cfg: <span class="kw-2">&amp;</span>DhcpConfig) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>storage_str = storage_dir.to_str().unwrap();
+    <span class="kw">fn </span>reload(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>r = <span class="kw">unsafe </span>{ libc::kill(<span class="self">self</span>.child.id().try_into().unwrap(), libc::SIGHUP) };
+        <span class="kw">if </span>r &lt; <span class="number">0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::last_os_error().into());
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}
 
-        <span class="kw">let </span>name = <span class="kw-2">&amp;</span>cfg.interface;
+<span class="kw">impl </span>Drop <span class="kw">for </span>DnsmasqHandle {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.child.kill().unwrap();
+        <span class="self">self</span>.child.wait().unwrap();
+    }
+}
 
-        <span class="kw">let </span><span class="kw-2">mut </span>dnsmasq_conf = File::create(storage_dir.join(<span class="string">"dnsmasq.conf"</span>))<span class="question-mark">?</span>;
-        <span class="kw">let </span>hosts = File::create(storage_dir.join(<span class="string">"hosts"</span>))<span class="question-mark">?</span>;
+<span class="kw">async fn </span>write_config(state: <span class="kw-2">&amp;</span>State) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span>name = state.config.dhcp.interface.deref();
 
-        <span class="kw">let </span>dhcp_dynamic_conf = <span class="kw">match </span>cfg.mode {
-            DhcpMode::Static(low, high) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{low},{high}"</span>),
-            DhcpMode::Proxy(ip) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{},proxy"</span>, ip),
-        };
+    <span class="kw">let </span><span class="kw-2">mut </span>dnsmasq_conf = File::create(state.storage_dir.join(<span class="string">"dnsmasq.conf"</span>))<span class="question-mark">?</span>;
 
-        <span class="macro">write!</span>(
-            dnsmasq_conf,
-            <span class="string">r#"
+    <span class="kw">let </span>dhcp_dynamic_conf = <span class="kw">match </span>state.config.dhcp.mode {
+        DhcpMode::Static(low, high) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{low},{high}"</span>),
+        DhcpMode::Proxy(ip) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{},proxy"</span>, ip),
+    };
+
+    <span class="macro">write!</span>(
+        dnsmasq_conf,
+        <span class="string">r#"
 ### Per-network configuration
 
 ## net0
@@ -187,65 +216,68 @@ dhcp-vendorclass=set:netboot,PXEClient:Arch:00006
 dhcp-vendorclass=set:netboot,PXEClient:Arch:00007
 dhcp-vendorclass=set:netboot,PXEClient:Arch:00009
 dhcp-vendorclass=set:netboot,pixie
-"#
-        </span>)<span class="question-mark">?</span>;
+"#</span>,
+        storage_str = state.storage_dir.to_str().unwrap()
+    )<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>child = Command::new(<span class="string">"dnsmasq"</span>)
-            .arg(<span class="macro">format!</span>(<span class="string">"--conf-file={storage_str}/dnsmasq.conf"</span>))
-            .arg(<span class="string">"--log-dhcp"</span>)
-            .arg(<span class="string">"--no-daemon"</span>)
-            .spawn()<span class="question-mark">?</span>;
-
-        <span class="comment">// Without this sleep line, dnsmasq does not produce any output.
-        </span>std::thread::sleep(Duration::from_secs(<span class="number">1</span>));
-        <span class="macro">assert!</span>(child.try_wait()<span class="question-mark">?</span>.is_none());
-
-        <span class="kw">let </span><span class="kw-2">mut </span>hostmap = HashMap::new();
-
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(hostsfile) = <span class="kw-2">&amp;</span>cfg.hostsfile {
-            <span class="kw">match </span>hostfile::parse_file(hostsfile) {
-                <span class="prelude-val">Ok</span>(hosts) =&gt; {
-                    <span class="kw">for </span>host <span class="kw">in </span>hosts {
-                        <span class="kw">if let </span>IpAddr::V4(ip) = host.ip {
-                            hostmap.insert(ip, host.names[<span class="number">0</span>].clone());
-                        }
-                    }
-                }
-                <span class="prelude-val">Err</span>(err) =&gt; {
-                    <span class="macro">bail!</span>(<span class="string">"Error parsing host file: {err}"</span>);
-                }
-            }
-        }
-
-        <span class="prelude-val">Ok</span>(DnsmasqHandle {
-            child,
-            hosts,
-            hostmap,
-        })
-    }
-
-    <span class="kw">pub fn </span>set_hosts(<span class="kw-2">&amp;mut </span><span class="self">self</span>, hosts: <span class="kw-2">&amp;</span>Vec&lt;Unit&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="self">self</span>.hosts.set_len(<span class="number">0</span>)<span class="question-mark">?</span>;
-        <span class="kw">for </span>host <span class="kw">in </span>hosts {
-            <span class="kw">let </span>mac = host.mac;
-            <span class="kw">let </span>ip = host.static_ip();
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(hostname) = <span class="self">self</span>.hostmap.get(<span class="kw-2">&amp;</span>ip) {
-                <span class="macro">writeln!</span>(<span class="self">self</span>.hosts, <span class="string">"{},{},{}"</span>, mac, ip, hostname)<span class="question-mark">?</span>;
-            } <span class="kw">else </span>{
-                <span class="macro">writeln!</span>(<span class="self">self</span>.hosts, <span class="string">"{},{}"</span>, mac, ip)<span class="question-mark">?</span>;
-            }
-        }
-        <span class="kw">let </span>r = <span class="kw">unsafe </span>{ libc::kill(<span class="self">self</span>.child.id().try_into().unwrap(), libc::SIGHUP) };
-        <span class="kw">if </span>r &lt; <span class="number">0 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::last_os_error().into());
-        }
-        <span class="prelude-val">Ok</span>(())
-    }
+    <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">impl </span>Drop <span class="kw">for </span>DnsmasqHandle {
-    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.child.kill().unwrap();
+<span class="kw">async fn </span>write_hosts(state: <span class="kw-2">&amp;</span>State, hosts: <span class="kw-2">&amp;</span>[(MacAddr6, Ipv4Addr, <span class="prelude-ty">Option</span>&lt;String&gt;)]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span>file = File::create(state.storage_dir.join(<span class="string">"hosts"</span>))<span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>file = BufWriter::new(file);
+
+    <span class="kw">for </span>(mac, ip, hostname) <span class="kw">in </span>hosts {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(hostname) = hostname {
+            <span class="macro">writeln!</span>(file, <span class="string">"{},{},{}"</span>, mac, ip, hostname)<span class="question-mark">?</span>;
+        } <span class="kw">else </span>{
+            <span class="macro">writeln!</span>(file, <span class="string">"{},{}"</span>, mac, ip)<span class="question-mark">?</span>;
+        }
+    }
+    <span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">fn </span>get_hosts(state: <span class="kw-2">&amp;</span>State, units: <span class="kw-2">&amp;</span>[Unit]) -&gt; Vec&lt;(MacAddr6, Ipv4Addr, <span class="prelude-ty">Option</span>&lt;String&gt;)&gt; {
+    units
+        .iter()
+        .map(|unit| {
+            <span class="kw">let </span>mac = unit.mac;
+            <span class="kw">let </span>ip = unit.static_ip();
+            <span class="kw">let </span>hostname = state.hostmap.get(<span class="kw-2">&amp;</span>ip).cloned();
+            (mac, ip, hostname)
+        })
+        .collect()
+}
+
+<span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>units_rx = state.units.subscribe();
+
+    write_config(<span class="kw-2">&amp;</span>state).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>hosts = get_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
+    write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
+
+    <span class="kw">let </span>dnsmasq = DnsmasqHandle {
+        child: Command::new(<span class="string">"dnsmasq"</span>)
+            .arg(<span class="macro">format!</span>(
+                <span class="string">"--conf-file={storage_str}/dnsmasq.conf"</span>,
+                storage_str = state.storage_dir.to_str().unwrap()
+            ))
+            .arg(<span class="string">"--log-dhcp"</span>)
+            .arg(<span class="string">"--no-daemon"</span>)
+            .spawn()<span class="question-mark">?</span>,
+    };
+
+    <span class="kw">loop </span>{
+        <span class="macro">tokio::select! </span>{
+            <span class="kw">_ </span>= units_rx.changed() =&gt; {
+                <span class="kw">let </span>hosts2 = get_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
+                <span class="kw">if </span>hosts != hosts2 {
+                    hosts = hosts2;
+                    write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
+                    dnsmasq.reload()<span class="question-mark">?</span>;
+                }
+            }
+        }
     }
 }
 </code></pre></div></section></main></body></html>

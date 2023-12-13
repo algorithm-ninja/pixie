@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["DnsmasqHandle"]};
+window.SIDEBAR_ITEMS = {"fn":["get_hosts","main","write_config","write_hosts"],"struct":["DnsmasqHandle"]};

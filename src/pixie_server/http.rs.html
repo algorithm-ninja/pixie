@@ -221,6 +221,10 @@
 <a href="#221" id="221">221</a>
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{error::Error, fs, net::Ipv4Addr, sync::Arc};
 
 <span class="kw">use </span>actix_files::Files;
@@ -245,8 +249,6 @@
     path: Path&lt;(String, String)&gt;,
     state: Data&lt;State&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
-
     <span class="kw">let </span><span class="prelude-val">Ok</span>(action) = path.<span class="number">1</span>.parse() <span class="kw">else </span>{
         <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown action: {:?}"</span>, path.<span class="number">1</span>)
             .customize()
@@ -255,48 +257,53 @@
 
     <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
 
-    <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.mac == mac {
+    state.units.send_if_modified(|units| {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.mac == mac {
+                    unit.next_action = action;
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.static_ip() == ip {
+                    unit.next_action = action;
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 unit.next_action = action;
                 updated += <span class="number">1</span>;
             }
-        }
-    } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.static_ip() == ip {
-                unit.next_action = action;
-                updated += <span class="number">1</span>;
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.group == group {
+                    unit.next_action = action;
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
+                    unit.next_action = action;
+                    updated += <span class="number">1</span>;
+                }
             }
         }
-    } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            unit.next_action = action;
-            updated += <span class="number">1</span>;
-        }
-    } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.group == group {
-                unit.next_action = action;
-                updated += <span class="number">1</span>;
-            }
-        }
-    } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
-                unit.next_action = action;
-                updated += <span class="number">1</span>;
-            }
-        }
+
+        updated &gt; <span class="number">0
+    </span>});
+
+    <span class="kw">if </span>updated &gt; <span class="number">0 </span>{
+        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
     } <span class="kw">else </span>{
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
+        <span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
             </span>.to_owned()
             .customize()
-            .with_status(StatusCode::BAD_REQUEST));
+            .with_status(StatusCode::BAD_REQUEST))
     }
-
-    fs::write(state.registered_file(), serde_json::to_vec(<span class="kw-2">&amp;*</span>units)<span class="question-mark">?</span>)<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
 }
 
 <span class="attr">#[get(<span class="string">"/admin/image/{mac}/{image}"</span>)]
@@ -304,8 +311,6 @@
     path: Path&lt;(String, String)&gt;,
     state: Data&lt;State&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
-
     <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">1</span>) {
         <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown image: {:?}"</span>, path.<span class="number">1</span>)
             .to_owned()
@@ -315,48 +320,53 @@
 
     <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
 
-    <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.mac == mac {
+    state.units.send_if_modified(|units| {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.mac == mac {
+                    unit.image = path.<span class="number">1</span>.clone();
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.static_ip() == ip {
+                    unit.image = path.<span class="number">1</span>.clone();
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 unit.image = path.<span class="number">1</span>.clone();
                 updated += <span class="number">1</span>;
             }
-        }
-    } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.static_ip() == ip {
-                unit.image = path.<span class="number">1</span>.clone();
-                updated += <span class="number">1</span>;
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.group == group {
+                    unit.image = path.<span class="number">1</span>.clone();
+                    updated += <span class="number">1</span>;
+                }
+            }
+        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+                <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
+                    unit.image = path.<span class="number">1</span>.clone();
+                    updated += <span class="number">1</span>;
+                }
             }
         }
-    } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            unit.image = path.<span class="number">1</span>.clone();
-            updated += <span class="number">1</span>;
-        }
-    } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.group == group {
-                unit.image = path.<span class="number">1</span>.clone();
-                updated += <span class="number">1</span>;
-            }
-        }
-    } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
-        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-            <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
-                unit.image = path.<span class="number">1</span>.clone();
-                updated += <span class="number">1</span>;
-            }
-        }
+
+        updated &gt; <span class="number">0
+    </span>});
+
+    <span class="kw">if </span>updated &gt; <span class="number">0 </span>{
+        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
     } <span class="kw">else </span>{
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
+        <span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
             </span>.to_owned()
             .customize()
-            .with_status(StatusCode::BAD_REQUEST));
+            .with_status(StatusCode::BAD_REQUEST))
     }
-
-    fs::write(state.registered_file(), serde_json::to_vec(<span class="kw-2">&amp;*</span>units)<span class="question-mark">?</span>)<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
 }
 
 <span class="attr">#[get(<span class="string">"/admin/gc"</span>)]
@@ -386,14 +396,12 @@
 
 <span class="attr">#[get(<span class="string">"/admin/units"</span>)]
 </span><span class="kw">async fn </span>get_units(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;*</span>state.units.lock().unwrap()))
+    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;*</span>state.units.borrow()))
 }
 
 <span class="attr">#[get(<span class="string">"/admin/hostmap"</span>)]
 </span><span class="kw">async fn </span>get_hostmap(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="prelude-val">Ok</span>(serde_json::to_string(
-        <span class="kw-2">&amp;</span>state.dnsmasq_handle.lock().unwrap().hostmap,
-    ))
+    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;</span>state.hostmap))
 }
 
 <span class="attr">#[get(<span class="string">"/admin/images"</span>)]

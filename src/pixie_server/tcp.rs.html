@@ -255,6 +255,9 @@
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::btree_map::Entry,
     io::ErrorKind,
@@ -270,7 +273,7 @@
     net::{TcpListener, TcpStream},
 };
 
-<span class="kw">use </span>anyhow::{anyhow, bail, Context, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span>anyhow::{anyhow, bail, <span class="prelude-ty">Result</span>};
 <span class="kw">use </span>macaddr::MacAddr6;
 <span class="kw">use </span>mktemp::Temp;
 
@@ -309,15 +312,13 @@
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown group: {}"</span>, station.group).into_bytes());
             };
 
-            <span class="kw">let </span>buf;
-            {
-                <span class="kw">let </span><span class="kw-2">mut </span>guard = state
-                    .last
-                    .lock()
-                    .map_err(|<span class="kw">_</span>| <span class="macro">anyhow!</span>(<span class="string">"last mutex is poisoned"</span>))<span class="question-mark">?</span>;
-                <span class="kw-2">*</span>guard = station.clone();
+            <span class="kw">let </span><span class="kw-2">mut </span>guard = state
+                .last
+                .lock()
+                .map_err(|<span class="kw">_</span>| <span class="macro">anyhow!</span>(<span class="string">"last mutex is poisoned"</span>))<span class="question-mark">?</span>;
+            <span class="kw-2">*</span>guard = station.clone();
 
-                <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
+            state.units.send_modify(|units| {
                 <span class="kw">let </span>unit = units.iter_mut().position(|unit| unit.mac == peer_mac);
                 <span class="kw">match </span>unit {
                     <span class="prelude-val">Some</span>(unit) =&gt; {
@@ -342,18 +343,7 @@
                         units.push(unit);
                     }
                 }
-
-                state
-                    .dnsmasq_handle
-                    .lock()
-                    .expect(<span class="string">"dnsmasq mutex is poisoned"</span>)
-                    .set_hosts(<span class="kw-2">&amp;</span>units)
-                    .context(<span class="string">"changing dnsmasq hosts"</span>)<span class="question-mark">?</span>;
-
-                buf = postcard::to_allocvec(<span class="kw-2">&amp;*</span>units)<span class="question-mark">?</span>;
-            }
-
-            atomic_write(<span class="kw-2">&amp;</span>state.registered_file(), <span class="kw-2">&amp;</span>buf).<span class="kw">await</span><span class="question-mark">?</span>;
+            });
 
             Vec::new()
         }
@@ -419,55 +409,71 @@
             Vec::new()
         }
         TcpRequest::GetAction =&gt; {
-            <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
-            <span class="kw">let </span><span class="kw-2">mut </span>unit = units.iter_mut().find(|unit| unit.mac == peer_mac);
-            <span class="kw">let </span>action_kind = <span class="kw">match </span>unit {
-                <span class="prelude-val">Some</span>(Unit {
-                    curr_action: <span class="prelude-val">Some</span>(action),
-                    ..
-                }) =&gt; <span class="kw-2">*</span>action,
-                <span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>unit) =&gt; {
-                    <span class="kw">let </span>action = unit.next_action;
-                    unit.curr_action = <span class="prelude-val">Some</span>(action);
-                    <span class="kw">if </span><span class="macro">matches!</span>(
-                        unit.next_action,
-                        ActionKind::Push | ActionKind::Pull | ActionKind::Register
-                    ) {
-                        unit.next_action = ActionKind::Wait;
+            <span class="kw">let </span><span class="kw-2">mut </span>action = Action::Wait;
+
+            state.units.send_if_modified(|units| {
+                <span class="kw">let </span><span class="kw-2">mut </span>unit = units.iter_mut().find(|unit| unit.mac == peer_mac);
+
+                <span class="kw">let </span>modified;
+                <span class="kw">let </span>action_kind;
+
+                <span class="kw">match </span>unit {
+                    <span class="prelude-val">Some</span>(Unit {
+                        curr_action: <span class="prelude-val">Some</span>(action),
+                        ..
+                    }) =&gt; {
+                        action_kind = <span class="kw-2">*</span>action;
+                        modified = <span class="bool-val">false</span>;
                     }
-                    action
+                    <span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>unit) =&gt; {
+                        <span class="kw">let </span>action = unit.next_action;
+                        unit.curr_action = <span class="prelude-val">Some</span>(action);
+                        <span class="kw">if </span><span class="macro">matches!</span>(
+                            unit.next_action,
+                            ActionKind::Push | ActionKind::Pull | ActionKind::Register
+                        ) {
+                            unit.next_action = ActionKind::Wait;
+                        }
+                        action_kind = action;
+                        modified = <span class="bool-val">true</span>;
+                    }
+                    <span class="prelude-val">None </span>=&gt; {
+                        action_kind = state.config.boot.unregistered;
+                        modified = <span class="bool-val">false</span>;
+                    }
                 }
-                <span class="prelude-val">None </span>=&gt; state.config.boot.unregistered,
-            };
 
-            <span class="kw">let </span>action = <span class="kw">match </span>action_kind {
-                ActionKind::Reboot =&gt; Action::Reboot,
-                ActionKind::Register =&gt; Action::Register {
-                    hint_port: state.config.hosts.hint_port,
-                },
-                ActionKind::Push =&gt; Action::Push {
-                    image: unit.unwrap().image.clone(),
-                },
-                ActionKind::Pull =&gt; Action::Pull {
-                    image: unit.unwrap().image.clone(),
-                    chunks_port: state.config.hosts.chunks_port,
-                },
-                ActionKind::Wait =&gt; Action::Wait,
-            };
+                action = <span class="kw">match </span>action_kind {
+                    ActionKind::Reboot =&gt; Action::Reboot,
+                    ActionKind::Register =&gt; Action::Register {
+                        hint_port: state.config.hosts.hint_port,
+                    },
+                    ActionKind::Push =&gt; Action::Push {
+                        image: unit.unwrap().image.clone(),
+                    },
+                    ActionKind::Pull =&gt; Action::Pull {
+                        image: unit.unwrap().image.clone(),
+                        chunks_port: state.config.hosts.chunks_port,
+                    },
+                    ActionKind::Wait =&gt; Action::Wait,
+                };
 
-            <span class="comment">// TODO(virv): async
-            </span>std::fs::write(state.registered_file(), serde_json::to_vec(<span class="kw-2">&amp;*</span>units)<span class="question-mark">?</span>)<span class="question-mark">?</span>;
+                modified
+            });
+
             postcard::to_allocvec(<span class="kw-2">&amp;</span>action)<span class="question-mark">?
         </span>}
         TcpRequest::ActionComplete =&gt; {
-            <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) {
+            state.units.send_if_modified(|units| {
+                <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{
+                    <span class="macro">log::warn!</span>(<span class="string">"Got ActionComplete from unknown unit"</span>);
+                    <span class="kw">return </span><span class="bool-val">false</span>;
+                };
+
                 unit.curr_action = <span class="prelude-val">None</span>;
                 unit.curr_progress = <span class="prelude-val">None</span>;
-                std::fs::write(state.registered_file(), serde_json::to_vec(<span class="kw-2">&amp;*</span>units)<span class="question-mark">?</span>)<span class="question-mark">?</span>;
-            } <span class="kw">else </span>{
-                <span class="macro">log::warn!</span>(<span class="string">"Got NA from unknown unit"</span>);
-            };
+                <span class="bool-val">true
+            </span>});
 
             Vec::new()
         }

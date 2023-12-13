@@ -222,6 +222,7 @@
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::BTreeSet,
     fs,
@@ -315,10 +316,9 @@
                     <span class="number">8 </span>* (sent_len <span class="kw">as </span>u32) * Duration::from_secs(<span class="number">1</span>) / hosts_cfg.bits_per_second;
             }
 
-            <span class="kw">for </span>index <span class="kw">in </span><span class="number">0</span>..<span class="number">32</span>.min(num_packets) {
+            <span class="kw">for </span>(index, body) <span class="kw">in </span>xor.iter().enumerate().take(num_packets) {
                 write_buf[<span class="number">32</span>..<span class="number">34</span>].clone_from_slice(<span class="kw-2">&amp;</span>(index <span class="kw">as </span>u16).wrapping_sub(<span class="number">32</span>).to_le_bytes());
                 <span class="kw">let </span>len = BODY_LEN;
-                <span class="kw">let </span>body = <span class="kw-2">&amp;</span>xor[index];
                 write_buf[<span class="number">34</span>..<span class="number">34 </span>+ len].clone_from_slice(body);
 
                 time::sleep_until(wait_for).<span class="kw">await</span>;
@@ -342,8 +342,7 @@
 
     <span class="kw">let </span>positions = state
         .units
-        .lock()
-        .unwrap()
+        .borrow()
         .iter()
         .filter(|unit| unit.group == <span class="kw-2">*</span>state.config.groups.get_by_first(<span class="kw-2">&amp;</span>last.group).unwrap())
         .map(|unit| (unit.row, unit.col))
@@ -408,12 +407,15 @@
                         <span class="kw">continue </span><span class="lifetime">'recv_packet</span>;
                     }
                 };
-                <span class="kw">let </span><span class="kw-2">mut </span>units = state.units.lock().unwrap();
-                <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{
-                    <span class="macro">log::warn!</span>(<span class="string">"Got AP from unknown unit"</span>);
-                    <span class="kw">continue</span>;
-                };
-                unit.curr_progress = <span class="prelude-val">Some</span>((frac, tot));
+                state.units.send_if_modified(|units| {
+                    <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{
+                        <span class="macro">log::warn!</span>(<span class="string">"Got ActionProgress from unknown unit"</span>);
+                        <span class="kw">return </span><span class="bool-val">false</span>;
+                    };
+
+                    unit.curr_progress = <span class="prelude-val">Some</span>((frac, tot));
+                    <span class="bool-val">true
+                </span>});
             }
             <span class="prelude-val">Ok</span>(UdpRequest::RequestChunks(chunks)) =&gt; {
                 <span class="kw">for </span>hash <span class="kw">in </span>chunks {
