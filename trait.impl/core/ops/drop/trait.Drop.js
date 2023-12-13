@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"uefi_app":[["impl&lt;T&gt; Drop for <a class=\"struct\" href=\"uefi_app/os/mpsc/struct.Sender.html\" title=\"struct uefi_app::os::mpsc::Sender\">Sender</a>&lt;T&gt;"],["impl Drop for <a class=\"struct\" href=\"uefi_app/os/net/struct.UdpHandle.html\" title=\"struct uefi_app::os::net::UdpHandle\">UdpHandle</a>"],["impl Drop for <a class=\"struct\" href=\"uefi_app/os/net/struct.SNPDevice.html\" title=\"struct uefi_app::os::net::SNPDevice\">SNPDevice</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

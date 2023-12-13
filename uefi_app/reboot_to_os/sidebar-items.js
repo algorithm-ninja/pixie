@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["reboot_to_os"]};

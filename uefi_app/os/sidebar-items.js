@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MessageKind"],"fn":["exit_boot_services"],"mod":["boot_options","disk","error","executor","mpsc","net","rng","timer"],"static":["OS","OS_CONSTRUCTED","UI_DRAWER"],"struct":["BytesFmt","UefiOS","UefiOSImpl"]};
