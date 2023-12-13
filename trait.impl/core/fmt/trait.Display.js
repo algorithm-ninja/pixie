@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"uefi_app":[["impl Display for <a class=\"enum\" href=\"uefi_app/os/error/enum.Error.html\" title=\"enum uefi_app::os::error::Error\">Error</a>"],["impl Display for <a class=\"struct\" href=\"uefi_app/os/struct.BytesFmt.html\" title=\"struct uefi_app::os::BytesFmt\">BytesFmt</a>"]]
+"pixie_web":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/fmt/trait.Display.html\" title=\"trait core::fmt::Display\">Display</a> for <a class=\"struct\" href=\"pixie_web/struct.Bytes.html\" title=\"struct pixie_web::Bytes\">Bytes</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

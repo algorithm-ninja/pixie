@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"pixie_shared":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.StructuralEq.html\" title=\"trait core::marker::StructuralEq\">StructuralEq</a> for <a class=\"struct\" href=\"pixie_shared/struct.ImageStat.html\" title=\"struct pixie_shared::ImageStat\">ImageStat</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
