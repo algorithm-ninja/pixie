@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["atomic_write","handle_connection","handle_request","main"]};
+window.SIDEBAR_ITEMS = {"fn":["handle_connection","handle_request","main"]};

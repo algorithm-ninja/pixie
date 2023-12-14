@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/state.rs`."><title>state.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-e883e87179a81222.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="pixie_server" data-themes="" data-resource-suffix="" data-rustdoc-version="1.76.0-nightly (3340d49d2 2023-12-12)" data-channel="nightly" data-search-js="search-cca444cbb68c36e9.js" data-settings-js="settings-fe03fdc259827cd2.js" ><script src="../../static.files/storage-bc37acceda91d44a.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-77dede896d6ac08e.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/state.rs`."><title>state.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-e883e87179a81222.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="pixie_server" data-themes="" data-resource-suffix="" data-rustdoc-version="1.76.0-nightly (eeff92ad3 2023-12-13)" data-channel="nightly" data-search-js="search-ec029af4ec3ae4df.js" data-settings-js="settings-fe03fdc259827cd2.js" ><script src="../../static.files/storage-bc37acceda91d44a.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-77dede896d6ac08e.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -144,25 +144,102 @@
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
 <a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{BTreeMap, HashMap},
     fs::{<span class="self">self</span>, File},
     net::{IpAddr, Ipv4Addr},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
-    time::Duration,
 };
 
-<span class="kw">use </span>anyhow::{anyhow, Context, <span class="prelude-ty">Result</span>};
-<span class="kw">use </span>tokio::{
-    sync::{watch, Mutex <span class="kw">as </span>AsyncMutex},
-    time,
-};
+<span class="kw">use </span>anyhow::{anyhow, bail, Context, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span>mktemp::Temp;
+<span class="kw">use </span>tokio::sync::{watch, Mutex <span class="kw">as </span>AsyncMutex};
 
-<span class="kw">use </span>pixie_shared::{ChunkStat, Config, Image, ImageStat, Station, Unit};
+<span class="kw">use </span>pixie_shared::{ChunkHash, ChunkStat, Config, Image, ImageStat, Station, Unit};
 
-<span class="kw">const </span>CONFIG: <span class="kw-2">&amp;</span>str = <span class="string">"config.yaml"</span>;
-<span class="kw">const </span>UNITS: <span class="kw-2">&amp;</span>str = <span class="string">"registered.json"</span>;
+<span class="kw">fn </span>atomic_write(path: <span class="kw-2">&amp;</span>Path, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="comment">// TODO(virv): find a better way to make a temporary file
+    </span><span class="kw">let </span>tmp_file = Temp::new_file_in(path.parent().unwrap())<span class="question-mark">?</span>.release();
+    fs::write(<span class="kw-2">&amp;</span>tmp_file, data)<span class="question-mark">?</span>;
+    fs::rename(<span class="kw-2">&amp;</span>tmp_file, path)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(())
+}
 
 <span class="kw">pub struct </span>State {
     <span class="kw">pub </span>storage_dir: PathBuf,
@@ -177,13 +254,9 @@
 }
 
 <span class="kw">impl </span>State {
-    <span class="kw">pub fn </span>registered_file(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PathBuf {
-        <span class="self">self</span>.storage_dir.join(UNITS)
-    }
-
     <span class="kw">pub fn </span>load(storage_dir: PathBuf) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
         <span class="kw">let </span>config: Config = {
-            <span class="kw">let </span>path = storage_dir.join(CONFIG);
+            <span class="kw">let </span>path = storage_dir.join(<span class="string">"config.yaml"</span>);
             <span class="kw">let </span>file = File::open(<span class="kw-2">&amp;</span>path)
                 .with_context(|| <span class="macro">format!</span>(<span class="string">"open config file: {}"</span>, path.display()))<span class="question-mark">?</span>;
             serde_yaml::from_reader(file)
@@ -201,7 +274,7 @@
             }
         }
 
-        <span class="kw">let </span>units_path = storage_dir.join(UNITS);
+        <span class="kw">let </span>units_path = storage_dir.join(<span class="string">"registered.json"</span>);
         <span class="kw">let </span>units = watch::Sender::new({
             <span class="kw">if </span>units_path.exists() {
                 <span class="kw">let </span>file = File::open(<span class="kw-2">&amp;</span>units_path).with_context(|| {
@@ -219,9 +292,8 @@
         tokio::spawn(<span class="kw">async move </span>{
             <span class="kw">while </span>units_rx.changed().<span class="kw">await</span>.is_ok() {
                 <span class="kw">let </span>units = units_rx.borrow_and_update().clone();
-                <span class="kw">let </span><span class="kw-2">mut </span>file = File::create(<span class="kw-2">&amp;</span>units_path).unwrap();
-                serde_json::to_writer(<span class="kw-2">&amp;mut </span>file, <span class="kw-2">&amp;</span>units).unwrap();
-                time::sleep(Duration::from_secs(<span class="number">1</span>)).<span class="kw">await</span>;
+                <span class="kw">let </span>json = serde_json::to_vec(<span class="kw-2">&amp;</span>units).unwrap();
+                atomic_write(<span class="kw-2">&amp;</span>units_path, <span class="kw-2">&amp;</span>json).unwrap();
             }
         });
 
@@ -288,6 +360,84 @@
                 images,
             }),
         })
+    }
+
+    <span class="kw">pub async fn </span>gc_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>image_stats = <span class="self">self</span>.image_stats.lock().<span class="kw">await</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>chunk_stats = <span class="self">self</span>.chunk_stats.lock().<span class="kw">await</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>cnt = <span class="number">0</span>;
+        chunk_stats.retain(|k, v| {
+            <span class="kw">if </span>v.ref_cnt == <span class="number">0 </span>{
+                <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">"chunks"</span>).join(hex::encode(k));
+                fs::remove_file(path).unwrap();
+                image_stats.total_csize -= v.csize;
+                image_stats.reclaimable -= v.csize;
+                cnt += <span class="number">1</span>;
+                <span class="bool-val">false
+            </span>} <span class="kw">else </span>{
+                <span class="bool-val">true
+            </span>}
+        });
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub async fn </span>add_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, hash: ChunkHash, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">"chunks"</span>).join(hex::encode(hash));
+
+        <span class="kw">let </span><span class="kw-2">mut </span>image_stats = <span class="self">self</span>.image_stats.lock().<span class="kw">await</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>chunk_stats = <span class="self">self</span>.chunk_stats.lock().<span class="kw">await</span>;
+
+        <span class="kw">let </span>chunk = ChunkStat {
+            csize: data.len() <span class="kw">as </span>u64,
+            ref_cnt: <span class="number">0</span>,
+        };
+        <span class="kw">let </span>ins = chunk_stats.insert(hash, chunk).is_none();
+        <span class="kw">if </span>ins {
+            atomic_write(<span class="kw-2">&amp;</span>path, data)<span class="question-mark">?</span>;
+            image_stats.total_csize += data.len() <span class="kw">as </span>u64;
+            image_stats.reclaimable += data.len() <span class="kw">as </span>u64;
+        }
+
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub async fn </span>add_image(<span class="kw-2">&amp;</span><span class="self">self</span>, name: String, image: Image) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if </span>!<span class="self">self</span>.config.images.contains(<span class="kw-2">&amp;</span>name) {
+            <span class="macro">bail!</span>(<span class="string">"Unknown image: {}"</span>, name);
+        }
+
+        <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">"images"</span>).join(<span class="kw-2">&amp;</span>name);
+        <span class="kw">let </span>data = postcard::to_allocvec(<span class="kw-2">&amp;</span>image)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>size = image.disk.iter().map(|chunk| chunk.size <span class="kw">as </span>u64).sum();
+        <span class="kw">let </span>csize = image.disk.iter().map(|chunk| chunk.csize <span class="kw">as </span>u64).sum();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>image_stats = <span class="self">self</span>.image_stats.lock().<span class="kw">await</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>chunk_stats = <span class="self">self</span>.chunk_stats.lock().<span class="kw">await</span>;
+
+        <span class="kw">if </span>path.exists() {
+            <span class="kw">let </span>old_image = fs::read(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
+            <span class="kw">let </span>old_image = postcard::from_bytes::&lt;Image&gt;(<span class="kw-2">&amp;</span>old_image)<span class="question-mark">?</span>;
+            <span class="kw">for </span>chunk <span class="kw">in </span>old_image.disk {
+                <span class="kw">let </span>info = chunk_stats.get_mut(<span class="kw-2">&amp;</span>chunk.hash).unwrap();
+                info.ref_cnt -= <span class="number">1</span>;
+                <span class="kw">if </span>info.ref_cnt == <span class="number">0 </span>{
+                    image_stats.reclaimable += info.csize;
+                }
+            }
+        }
+
+        atomic_write(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>data)<span class="question-mark">?</span>;
+        image_stats.images.insert(name, (size, csize));
+        <span class="kw">for </span>chunk <span class="kw">in </span>image.disk {
+            <span class="kw">let </span>info = chunk_stats.get_mut(<span class="kw-2">&amp;</span>chunk.hash).unwrap();
+            <span class="kw">if </span>info.ref_cnt == <span class="number">0 </span>{
+                image_stats.reclaimable -= info.csize;
+            }
+            info.ref_cnt += <span class="number">1</span>;
+        }
+
+        <span class="prelude-val">Ok</span>(())
     }
 }
 </code></pre></div></section></main></body></html>

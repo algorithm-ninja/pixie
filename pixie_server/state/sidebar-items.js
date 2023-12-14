@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":["CONFIG","UNITS"],"struct":["State"]};
+window.SIDEBAR_ITEMS = {"fn":["atomic_write"],"struct":["State"]};
