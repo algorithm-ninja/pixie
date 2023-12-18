@@ -57,6 +57,16 @@
 <a href="#56" id="56">56</a>
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
 </pre></div><pre class="rust"><code><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::vec::Vec;
@@ -72,7 +82,7 @@
     U: PartialEq,
 {
     <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
-        Bijection(Vec::new())
+        <span class="self">Self</span>(Vec::new())
     }
 
     <span class="kw">pub fn </span>get_by_first(<span class="kw-2">&amp;</span><span class="self">self</span>, t: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>U&gt; {
@@ -85,6 +95,10 @@
 
     <span class="kw">pub fn </span>iter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>(T, U)&gt; {
         <span class="self">self</span>.<span class="number">0</span>.iter()
+    }
+
+    <span class="kw">pub fn </span>as_slice(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[(T, U)] {
+        <span class="self">self</span>.<span class="number">0</span>.as_slice()
     }
 }
 
@@ -113,6 +127,12 @@
 
     <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
         <span class="self">self</span>.<span class="number">0</span>.into_iter()
+    }
+}
+
+<span class="kw">impl</span>&lt;T, U&gt; Default <span class="kw">for </span>Bijection&lt;T, U&gt; {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(Vec::new())
     }
 }
 </code></pre></div></section></main></body></html>

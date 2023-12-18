@@ -212,68 +212,93 @@
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
 <a href="#213" id="213">213</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::{error::Error, net::Ipv4Addr, sync::Arc};
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::Ipv4Addr, sync::Arc};
 
-<span class="kw">use </span>actix_files::Files;
-<span class="kw">use </span>actix_web::{
-    error::ErrorUnauthorized,
-    get,
-    http::StatusCode,
-    middleware::{Compress, Logger},
-    web::{Data, Path},
-    App, HttpServer, Responder,
-};
-<span class="kw">use </span>actix_web_httpauth::middleware::HttpAuthentication;
 <span class="kw">use </span>anyhow::Result;
+<span class="kw">use </span>axum::{
+    extract::{
+        <span class="self">self</span>,
+        ws::{<span class="self">self</span>, Message},
+        Path,
+    },
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 <span class="kw">use </span>macaddr::MacAddr6;
 
-<span class="kw">use </span>pixie_shared::HttpConfig;
+<span class="kw">use </span>pixie_shared::{HttpConfig, WsUpdate};
+<span class="kw">use </span>tokio::net::TcpListener;
+<span class="kw">use </span>tower_http::{
+    compression::CompressionLayer, services::ServeDir, trace::TraceLayer,
+    validate_request::ValidateRequestHeaderLayer,
+};
 
 <span class="kw">use </span><span class="kw">crate</span>::state::State;
 
-<span class="attr">#[get(<span class="string">"/admin/action/{mac}/{value}"</span>)]
-</span><span class="kw">async fn </span>action(
-    path: Path&lt;(String, String)&gt;,
-    state: Data&lt;State&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-    <span class="kw">let </span><span class="prelude-val">Ok</span>(action) = path.<span class="number">1</span>.parse() <span class="kw">else </span>{
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown action: {:?}"</span>, path.<span class="number">1</span>)
-            .customize()
-            .with_status(StatusCode::BAD_REQUEST));
+<span class="kw">async fn </span>action(
+    Path((unit_filter, action_name)): Path&lt;(String, String)&gt;,
+    extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;,
+) -&gt; <span class="kw">impl </span>IntoResponse {
+    <span class="kw">let </span><span class="prelude-val">Ok</span>(action) = action_name.parse() <span class="kw">else </span>{
+        <span class="kw">return </span>(
+            StatusCode::BAD_REQUEST,
+            <span class="macro">format!</span>(<span class="string">"Unknown action: {:?}\n"</span>, action_name),
+        );
     };
 
     <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
 
     state.units.send_if_modified(|units| {
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = unit_filter.parse::&lt;MacAddr6&gt;() {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.mac == mac {
                     unit.next_action = action;
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
+        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = unit_filter.parse::&lt;Ipv4Addr&gt;() {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.static_ip() == ip {
                     unit.next_action = action;
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
+        } <span class="kw">else if </span>unit_filter == <span class="string">"all" </span>{
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 unit.next_action = action;
                 updated += <span class="number">1</span>;
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>unit_filter) {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.group == group {
                     unit.next_action = action;
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>unit_filter) {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
+                <span class="kw">if </span>unit.image == unit_filter {
                     unit.next_action = action;
                     updated += <span class="number">1</span>;
                 }
@@ -284,60 +309,56 @@
     </span>});
 
     <span class="kw">if </span>updated &gt; <span class="number">0 </span>{
-        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
+        (StatusCode::OK, <span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>))
     } <span class="kw">else </span>{
-        <span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
-            </span>.to_owned()
-            .customize()
-            .with_status(StatusCode::BAD_REQUEST))
+        (StatusCode::BAD_REQUEST, <span class="string">"Unknown PC\n"</span>.to_owned())
     }
 }
 
-<span class="attr">#[get(<span class="string">"/admin/image/{mac}/{image}"</span>)]
-</span><span class="kw">async fn </span>image(
-    path: Path&lt;(String, String)&gt;,
-    state: Data&lt;State&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-    <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">1</span>) {
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown image: {:?}"</span>, path.<span class="number">1</span>)
-            .to_owned()
-            .customize()
-            .with_status(StatusCode::BAD_REQUEST));
+<span class="kw">async fn </span>image(
+    Path((unit_filter, image)): Path&lt;(String, String)&gt;,
+    extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;,
+) -&gt; <span class="kw">impl </span>IntoResponse {
+    <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>image) {
+        <span class="kw">return </span>(
+            StatusCode::BAD_REQUEST,
+            <span class="macro">format!</span>(<span class="string">"Unknown image: {:?}\n"</span>, image),
+        );
     }
 
     <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
 
     state.units.send_if_modified(|units| {
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = path.<span class="number">0</span>.parse::&lt;MacAddr6&gt;() {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = unit_filter.parse::&lt;MacAddr6&gt;() {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.mac == mac {
-                    unit.image = path.<span class="number">1</span>.clone();
+                    unit.image = image.clone();
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = path.<span class="number">0</span>.parse::&lt;Ipv4Addr&gt;() {
+        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = unit_filter.parse::&lt;Ipv4Addr&gt;() {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.static_ip() == ip {
-                    unit.image = path.<span class="number">1</span>.clone();
+                    unit.image = image.clone();
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if </span>path.<span class="number">0 </span>== <span class="string">"all" </span>{
+        } <span class="kw">else if </span>unit_filter == <span class="string">"all" </span>{
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                unit.image = path.<span class="number">1</span>.clone();
+                unit.image = image.clone();
                 updated += <span class="number">1</span>;
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>unit_filter) {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
                 <span class="kw">if </span>unit.group == group {
-                    unit.image = path.<span class="number">1</span>.clone();
+                    unit.image = image.clone();
                     updated += <span class="number">1</span>;
                 }
             }
-        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>path.<span class="number">0</span>) {
+        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>unit_filter) {
             <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.image == path.<span class="number">0 </span>{
-                    unit.image = path.<span class="number">1</span>.clone();
+                <span class="kw">if </span>unit.image == unit_filter {
+                    unit.image = image.clone();
                     updated += <span class="number">1</span>;
                 }
             }
@@ -347,40 +368,72 @@
     </span>});
 
     <span class="kw">if </span>updated &gt; <span class="number">0 </span>{
-        <span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>).customize())
+        (StatusCode::OK, <span class="macro">format!</span>(<span class="string">"{updated} computer(s) affected\n"</span>))
     } <span class="kw">else </span>{
-        <span class="prelude-val">Ok</span>(<span class="string">"Unknown PC"
-            </span>.to_owned()
-            .customize()
-            .with_status(StatusCode::BAD_REQUEST))
+        (StatusCode::BAD_REQUEST, <span class="string">"Unknown PC\n"</span>.to_owned())
     }
 }
 
-<span class="attr">#[get(<span class="string">"/admin/gc"</span>)]
-</span><span class="kw">async fn </span>gc(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
-    state.gc_chunks().<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(<span class="string">""</span>)
+<span class="kw">async fn </span>gc(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; String {
+    state.gc_chunks().<span class="kw">await</span>.unwrap();
+    <span class="string">""</span>.to_owned()
 }
 
-<span class="attr">#[get(<span class="string">"/admin/config"</span>)]
-</span><span class="kw">async fn </span>get_config(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;</span>state.config))
-}
+<span class="kw">async fn </span>ws(
+    extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;,
+    ws: extract::ws::WebSocketUpgrade,
+) -&gt; axum::response::Response {
+    ws.on_upgrade(<span class="kw">move </span>|<span class="kw-2">mut </span>socket| <span class="kw">async move </span>{
+        <span class="kw">let </span>msg = WsUpdate::Config(state.config.clone());
+        <span class="kw">let </span>msg = serde_json::to_string(<span class="kw-2">&amp;</span>msg).unwrap();
+        <span class="kw">let </span>msg = Message::Text(msg);
+        socket.send(msg).<span class="kw">await</span>.unwrap();
 
-<span class="attr">#[get(<span class="string">"/admin/units"</span>)]
-</span><span class="kw">async fn </span>get_units(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;*</span>state.units.borrow()))
-}
+        <span class="kw">let </span>msg = WsUpdate::HostMap(state.hostmap.clone());
+        <span class="kw">let </span>msg = serde_json::to_string(<span class="kw-2">&amp;</span>msg).unwrap();
+        <span class="kw">let </span>msg = Message::Text(msg);
+        socket.send(msg).<span class="kw">await</span>.unwrap();
 
-<span class="attr">#[get(<span class="string">"/admin/hostmap"</span>)]
-</span><span class="kw">async fn </span>get_hostmap(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;</span>state.hostmap))
-}
+        <span class="kw">let </span><span class="kw-2">mut </span>units_rx = state.units.subscribe();
+        units_rx.mark_changed();
 
-<span class="attr">#[get(<span class="string">"/admin/images"</span>)]
-</span><span class="kw">async fn </span>get_images(state: Data&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">impl </span>Responder, actix_web::Error&gt; {
-    <span class="kw">let </span>image_stats = state.image_stats.borrow();
-    <span class="prelude-val">Ok</span>(serde_json::to_string(<span class="kw-2">&amp;*</span>image_stats))
+        <span class="kw">let </span><span class="kw-2">mut </span>image_rx = state.image_stats.subscribe();
+        image_rx.mark_changed();
+
+        <span class="lifetime">'main_loop</span>: <span class="kw">loop </span>{
+            <span class="macro">tokio::select! </span>{
+                ret = units_rx.changed() =&gt; {
+                    ret.unwrap();
+                    <span class="kw">let </span>msg = {
+                        <span class="kw">let </span>units = units_rx.borrow_and_update();
+                        <span class="kw">let </span>msg = WsUpdate::Units(units.clone());
+                        <span class="kw">let </span>msg = serde_json::to_string(<span class="kw-2">&amp;</span>msg).unwrap();
+                        ws::Message::Text(msg)
+                    };
+                    socket.send(msg).<span class="kw">await</span>.unwrap();
+                }
+                ret = image_rx.changed() =&gt; {
+                    ret.unwrap();
+                    <span class="kw">let </span>msg = {
+                        <span class="kw">let </span>image_stats = image_rx.borrow_and_update();
+                        <span class="kw">let </span>msg = WsUpdate::ImageStats(image_stats.clone());
+                        <span class="kw">let </span>msg = serde_json::to_string(<span class="kw-2">&amp;</span>msg).unwrap();
+                        ws::Message::Text(msg)
+                    };
+                    socket.send(msg).<span class="kw">await</span>.unwrap();
+                }
+                packet = socket.recv() =&gt; {
+                    <span class="kw">let </span>packet = packet.unwrap().unwrap();
+                    <span class="kw">match </span>packet {
+                        Message::Close(<span class="kw">_</span>) =&gt; {
+                            <span class="kw">break </span><span class="lifetime">'main_loop</span>;
+                        }
+                        <span class="kw">_ </span>=&gt; {}
+                    }
+                }
+            };
+        }
+    })
 }
 
 <span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -389,39 +442,24 @@
         <span class="kw-2">ref </span>password,
     } = state.config.http;
 
-    <span class="kw">let </span>pw = password.clone();
+    <span class="kw">let </span>admin_path = state.storage_dir.join(<span class="string">"admin"</span>);
 
-    <span class="kw">let </span>admin = state.storage_dir.join(<span class="string">"admin"</span>);
-    <span class="kw">let </span>data: Data&lt;<span class="kw">_</span>&gt; = state.into();
+    <span class="kw">let </span>router = Router::new()
+        .route(<span class="string">"/admin/ws"</span>, get(ws))
+        .route(<span class="string">"/admin/gc"</span>, get(gc))
+        .route(<span class="string">"/admin/action/:unit/:action"</span>, get(action))
+        .route(<span class="string">"/admin/image/:unit/:image"</span>, get(image))
+        .nest_service(
+            <span class="string">"/"</span>,
+            ServeDir::new(<span class="kw-2">&amp;</span>admin_path).append_index_html_on_directories(<span class="bool-val">true</span>),
+        )
+        .layer(CompressionLayer::new())
+        .layer(ValidateRequestHeaderLayer::basic(<span class="kw-2">&amp;</span><span class="string">"admin"</span>, <span class="kw-2">&amp;</span>password))
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
 
-    HttpServer::new(<span class="kw">move </span>|| {
-        <span class="kw">let </span>pw = pw.clone();
-        App::new()
-            .wrap(Compress::default())
-            .wrap(Logger::default())
-            .wrap(HttpAuthentication::basic(<span class="kw">move </span>|req, credentials| {
-                <span class="kw">let </span>pw = pw.clone();
-                <span class="kw">async move </span>{
-                    <span class="kw">if </span>credentials.password() != <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>pw) {
-                        <span class="prelude-val">Err</span>((ErrorUnauthorized(<span class="string">"password incorrect"</span>), req))
-                    } <span class="kw">else </span>{
-                        <span class="prelude-val">Ok</span>(req)
-                    }
-                }
-            }))
-            .app_data(data.clone())
-            .service(action)
-            .service(image)
-            .service(gc)
-            .service(get_config)
-            .service(get_units)
-            .service(get_hostmap)
-            .service(get_images)
-            .service(Files::new(<span class="string">"/"</span>, <span class="kw-2">&amp;</span>admin).index_file(<span class="string">"index.html"</span>))
-    })
-    .bind(listen_on)<span class="question-mark">?
-    </span>.run()
-    .<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>listener = TcpListener::bind(listen_on).<span class="kw">await</span><span class="question-mark">?</span>;
+    axum::serve(listener, router).<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }
