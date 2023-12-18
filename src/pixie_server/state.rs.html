@@ -223,6 +223,16 @@
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{BTreeMap, HashMap},
     fs::{<span class="self">self</span>, File},
@@ -243,6 +253,17 @@
     fs::write(<span class="kw-2">&amp;</span>tmp_file, data)<span class="question-mark">?</span>;
     fs::rename(<span class="kw-2">&amp;</span>tmp_file, path)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">fn </span>get_image_disk_size(image: <span class="kw-2">&amp;</span>Image) -&gt; u64 {
+    <span class="kw">let </span><span class="kw-2">mut </span>chunks: Vec&lt;<span class="kw">_</span>&gt; = image
+        .disk
+        .iter()
+        .map(|chunk| (chunk.hash, chunk.csize))
+        .collect();
+    chunks.sort_unstable_by_key(|(hash, <span class="kw">_</span>)| <span class="kw-2">*</span>hash);
+    chunks.dedup_by_key(|(hash, <span class="kw">_</span>)| <span class="kw-2">*</span>hash);
+    chunks.into_iter().map(|(<span class="kw">_</span>, size)| size <span class="kw">as </span>u64).sum()
 }
 
 <span class="kw">pub struct </span>State {
@@ -333,11 +354,10 @@
                 }
                 <span class="kw">let </span>content = fs::read(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
                 <span class="kw">let </span>image = postcard::from_bytes::&lt;Image&gt;(<span class="kw-2">&amp;</span>content)<span class="question-mark">?</span>;
+                <span class="kw">let </span>csize = get_image_disk_size(<span class="kw-2">&amp;</span>image);
                 <span class="kw">let </span><span class="kw-2">mut </span>size = <span class="number">0</span>;
-                <span class="kw">let </span><span class="kw-2">mut </span>csize = <span class="number">0</span>;
                 <span class="kw">for </span>chunk <span class="kw">in </span>image.disk {
                     size += chunk.size <span class="kw">as </span>u64;
-                    csize += chunk.csize <span class="kw">as </span>u64;
                     chunk_stats.get_mut(<span class="kw-2">&amp;</span>chunk.hash).unwrap().ref_cnt += <span class="number">1</span>;
                 }
                 <span class="prelude-val">Ok</span>((image_name.clone(), (size, csize)))
@@ -415,7 +435,7 @@
         <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">"images"</span>).join(<span class="kw-2">&amp;</span>name);
         <span class="kw">let </span>data = postcard::to_allocvec(<span class="kw-2">&amp;</span>image)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>size = image.disk.iter().map(|chunk| chunk.size <span class="kw">as </span>u64).sum();
+        <span class="kw">let </span>size = get_image_disk_size(<span class="kw-2">&amp;</span>image);
         <span class="kw">let </span>csize = image.disk.iter().map(|chunk| chunk.csize <span class="kw">as </span>u64).sum();
 
         <span class="self">self</span>.image_stats.send_modify(|image_stats| {
