@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["atomic_write","get_image_disk_size"],"struct":["State"]};
+window.SIDEBAR_ITEMS = {"fn":["atomic_write","get_image_csize"],"struct":["State"]};

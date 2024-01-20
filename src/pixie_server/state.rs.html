@@ -254,7 +254,7 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn </span>get_image_disk_size(image: <span class="kw-2">&amp;</span>Image) -&gt; u64 {
+<span class="kw">fn </span>get_image_csize(image: <span class="kw-2">&amp;</span>Image) -&gt; u64 {
     <span class="kw">let </span><span class="kw-2">mut </span>chunks: Vec&lt;<span class="kw">_</span>&gt; = image
         .disk
         .iter()
@@ -353,7 +353,7 @@
                 }
                 <span class="kw">let </span>content = fs::read(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
                 <span class="kw">let </span>image = postcard::from_bytes::&lt;Image&gt;(<span class="kw-2">&amp;</span>content)<span class="question-mark">?</span>;
-                <span class="kw">let </span>csize = get_image_disk_size(<span class="kw-2">&amp;</span>image);
+                <span class="kw">let </span>csize = get_image_csize(<span class="kw-2">&amp;</span>image);
                 <span class="kw">let </span><span class="kw-2">mut </span>size = <span class="number">0</span>;
                 <span class="kw">for </span>chunk <span class="kw">in </span>image.disk {
                     size += chunk.size <span class="kw">as </span>u64;
@@ -434,8 +434,8 @@
         <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">&quot;images&quot;</span>).join(<span class="kw-2">&amp;</span>name);
         <span class="kw">let </span>data = postcard::to_allocvec(<span class="kw-2">&amp;</span>image)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>size = get_image_disk_size(<span class="kw-2">&amp;</span>image);
-        <span class="kw">let </span>csize = image.disk.iter().map(|chunk| chunk.csize <span class="kw">as </span>u64).sum();
+        <span class="kw">let </span>size = image.disk.iter().map(|chunk| chunk.size <span class="kw">as </span>u64).sum();
+        <span class="kw">let </span>csize = get_image_csize(<span class="kw-2">&amp;</span>image);
 
         <span class="self">self</span>.image_stats.send_modify(|image_stats| {
             <span class="kw">let </span><span class="kw-2">mut </span>chunk_stats = <span class="self">self</span>.chunk_stats.lock().unwrap();
