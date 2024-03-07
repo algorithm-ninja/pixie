@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/tcp.rs`."><title>tcp.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="pixie_server" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0 (82e1608df 2023-12-21)" data-channel="1.75.0" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-9dd44ab47b99a0fb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/tcp.rs`."><title>tcp.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-ac92e1bbe349e143.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="pixie_server" data-themes="" data-resource-suffix="" data-rustdoc-version="1.76.0 (07dca489a 2024-02-04)" data-channel="1.76.0" data-search-js="search-2b6ce74ff89ae146.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../../static.files/storage-f2adc0d6ca4d09fb.js"></script><script defer src="../../static.files/src-script-39ed315d46fb705f.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-305769736d49e732.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-feafe1bb7466e4bd.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><div class="sidebar-resizer"></div>
+    <main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -222,7 +223,7 @@
 <span class="kw">async fn </span>handle_request(state: <span class="kw-2">&amp;</span>State, req: TcpRequest, peer_mac: MacAddr6) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;&gt; {
     <span class="prelude-val">Ok</span>(<span class="kw">match </span>req {
         TcpRequest::GetChunkSize(hash) =&gt; {
-            <span class="kw">let </span>path = state.storage_dir.join(<span class="string">&quot;chunks&quot;</span>).join(hex::encode(hash));
+            <span class="kw">let </span>path = state.storage_dir.join(<span class="string">"chunks"</span>).join(hex::encode(hash));
             <span class="kw">let </span>csize = <span class="kw">match </span>fs::metadata(path).<span class="kw">await </span>{
                 <span class="prelude-val">Ok</span>(meta) =&gt; <span class="prelude-val">Some</span>(meta.len()),
                 <span class="prelude-val">Err</span>(e) <span class="kw">if </span>e.kind() == ErrorKind::NotFound =&gt; <span class="prelude-val">None</span>,
@@ -231,21 +232,21 @@
             postcard::to_allocvec(<span class="kw-2">&amp;</span>csize)<span class="question-mark">?
         </span>}
         TcpRequest::GetImage(name) =&gt; {
-            <span class="kw">let </span>path = state.storage_dir.join(<span class="string">&quot;images&quot;</span>).join(name);
+            <span class="kw">let </span>path = state.storage_dir.join(<span class="string">"images"</span>).join(name);
             fs::read(path).<span class="kw">await</span><span class="question-mark">?
         </span>}
         TcpRequest::Register(station) =&gt; {
             <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>station.image) {
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">&quot;Unknown image: {}&quot;</span>, station.image).into_bytes());
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown image: {}"</span>, station.image).into_bytes());
             }
             <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>station.group) <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">&quot;Unknown group: {}&quot;</span>, station.group).into_bytes());
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown group: {}"</span>, station.group).into_bytes());
             };
 
             <span class="kw">let </span><span class="kw-2">mut </span>guard = state
                 .last
                 .lock()
-                .map_err(|<span class="kw">_</span>| <span class="macro">anyhow!</span>(<span class="string">&quot;last mutex is poisoned&quot;</span>))<span class="question-mark">?</span>;
+                .map_err(|<span class="kw">_</span>| <span class="macro">anyhow!</span>(<span class="string">"last mutex is poisoned"</span>))<span class="question-mark">?</span>;
             <span class="kw-2">*</span>guard = station.clone();
 
             state.units.send_modify(|units| {
@@ -283,7 +284,7 @@
         }
         TcpRequest::UploadImage(name, image) =&gt; {
             <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>name) {
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">&quot;Unknown image: {}&quot;</span>, name).into_bytes());
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown image: {}"</span>, name).into_bytes());
             }
             state.add_image(name, image).<span class="kw">await</span><span class="question-mark">?</span>;
 
@@ -348,7 +349,7 @@
         TcpRequest::ActionComplete =&gt; {
             state.units.send_if_modified(|units| {
                 <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{
-                    <span class="macro">log::warn!</span>(<span class="string">&quot;Got ActionComplete from unknown unit&quot;</span>);
+                    <span class="macro">log::warn!</span>(<span class="string">"Got ActionComplete from unknown unit"</span>);
                     <span class="kw">return </span><span class="bool-val">false</span>;
                 };
 
@@ -368,7 +369,7 @@
     peer_addr: SocketAddr,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>IpAddr::V4(peer_ip) = peer_addr.ip() <span class="kw">else </span>{
-        <span class="macro">bail!</span>(<span class="string">&quot;IPv6 is not supported&quot;</span>)
+        <span class="macro">bail!</span>(<span class="string">"IPv6 is not supported"</span>)
     };
     <span class="kw">let </span>peer_mac = find_mac(peer_ip)<span class="question-mark">?</span>;
 
@@ -389,13 +390,13 @@
 
 <span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, ACTION_PORT)).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="macro">log::info!</span>(<span class="string">&quot;Listening on {}&quot;</span>, listener.local_addr()<span class="question-mark">?</span>);
+    <span class="macro">log::info!</span>(<span class="string">"Listening on {}"</span>, listener.local_addr()<span class="question-mark">?</span>);
     <span class="kw">loop </span>{
         <span class="kw">let </span>(stream, addr) = listener.accept().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>state = state.clone();
         tokio::spawn(<span class="kw">async move </span>{
             <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = handle_connection(state, stream, addr).<span class="kw">await </span>{
-                <span class="macro">log::error!</span>(<span class="string">&quot;Error handling tcp connection: {}&quot;</span>, e);
+                <span class="macro">log::error!</span>(<span class="string">"Error handling tcp connection: {}"</span>, e);
             }
         });
     }
