@@ -412,8 +412,6 @@
 <a href="#410" id="410">410</a>
 <a href="#411" id="411">411</a>
 <a href="#412" id="412">412</a>
-<a href="#413" id="413">413</a>
-<a href="#414" id="414">414</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::fmt;
 <span class="kw">use </span>std::net::Ipv4Addr;
@@ -450,20 +448,18 @@
 
 <span class="attr">#[component(inline_props)]
 </span><span class="kw">fn </span>UnitInfo&lt;G: Html&gt;(cx: Scope&lt;<span class="lifetime">'_</span>&gt;, unit: Unit, hostname: <span class="prelude-ty">Option</span>&lt;String&gt;) -&gt; View&lt;G&gt; {
-    <span class="kw">let </span>time = create_signal(cx, date_now());
+    <span class="kw">let </span>time = create_signal::&lt;i64&gt;(cx, (date_now() * <span class="number">0.001</span>) <span class="kw">as </span>i64);
 
     spawn_local_scoped(cx, <span class="kw">async move </span>{
         <span class="kw">loop </span>{
-            TimeoutFuture::new(<span class="number">100</span>).<span class="kw">await</span>;
-            time.set(date_now());
+            <span class="kw">let </span>now = date_now() <span class="kw">as </span>i64;
+            TimeoutFuture::new(<span class="number">1000 </span>- (now % <span class="number">1000</span>) <span class="kw">as </span>u32).<span class="kw">await</span>;
+            time.set(now / <span class="number">1000</span>);
         }
     });
 
     <span class="kw">let </span>ping_time = unit.last_ping_timestamp <span class="kw">as </span>i64;
-    <span class="kw">let </span>ping_ago = <span class="kw">move </span>|| {
-        <span class="kw">let </span>now = (<span class="kw-2">*</span>time.get() * <span class="number">0.001</span>) <span class="kw">as </span>i64;
-        now - ping_time
-    };
+    <span class="kw">let </span>ping_ago = <span class="kw">move </span>|| <span class="kw-2">*</span>time.get() - ping_time;
 
     <span class="kw">let </span>fmt_ca = <span class="kw">move </span>|unit: <span class="kw-2">&amp;</span>Unit| {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(a) = unit.curr_action {
