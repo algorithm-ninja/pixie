@@ -161,19 +161,14 @@ pub struct NetworkInterface {
 
 impl NetworkInterface {
     pub fn new(os: UefiOS) -> NetworkInterface {
-        let bo = os.boot_options();
-        let curopt = bo.get(bo.current());
-        let (descr, device) = bo.boot_entry_info(&curopt[..]);
-        os.append_message(
-            format!(
-                "Configuring network on interface used for booting ({} -- {})",
-                descr,
-                os.device_path_to_string(device),
-            ),
-            MessageKind::Info,
-        );
+        let all_handles = os
+            .all_handles::<SimpleNetwork>()
+            .expect("error getting SimpleNetwork handles");
+        let mut device = all_handles
+            .iter()
+            .filter_map(|x| os.open_handle::<SimpleNetwork>(*x).ok());
         let mut device = SnpDevice::new(Box::leak(Box::new(
-            os.open_protocol_on_device::<SimpleNetwork>(device).unwrap(),
+            device.next().expect("no network found"),
         )));
 
         let hw_addr = HardwareAddress::Ethernet(smoltcp::wire::EthernetAddress::from_bytes(
