@@ -169,7 +169,9 @@ async fn handle_connection(
     let IpAddr::V4(peer_ip) = peer_addr.ip() else {
         bail!("IPv6 is not supported")
     };
-    let peer_mac = find_mac(peer_ip)?;
+    let Ok(peer_mac) = find_mac(peer_ip) else {
+        return Ok(());
+    };
 
     loop {
         let len = match stream.read_u64_le().await {

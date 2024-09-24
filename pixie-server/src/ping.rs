@@ -20,7 +20,9 @@ pub async fn main(state: &State) -> Result<()> {
         let IpAddr::V4(peer_ip) = peer_addr.ip() else {
             bail!("IPv6 is not supported")
         };
-        let peer_mac = find_mac(peer_ip)?;
+        let Ok(peer_mac) = find_mac(peer_ip) else {
+            continue;
+        };
 
         state.units.send_if_modified(|units| {
             let Some(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) else {
