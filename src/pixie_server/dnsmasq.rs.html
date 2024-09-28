@@ -139,21 +139,23 @@
 <a href="#139" id="139">139</a>
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     fs::File,
     io::{BufWriter, Error, Write},
     net::Ipv4Addr,
-    ops::Deref,
     process::{Child, Command},
     sync::Arc,
 };
 
-<span class="kw">use </span>anyhow::Result;
+<span class="kw">use </span>anyhow::{Context, <span class="prelude-ty">Result</span>};
 
 <span class="kw">use </span>macaddr::MacAddr6;
-<span class="kw">use </span>pixie_shared::{DhcpMode, Unit};
+<span class="kw">use </span>pixie_shared::Unit;
 
-<span class="kw">use </span><span class="kw">crate</span>::state::State;
+<span class="kw">use crate</span>::{find_network, state::State};
 
 <span class="kw">struct </span>DnsmasqHandle {
     child: Child,
@@ -177,13 +179,16 @@
 }
 
 <span class="kw">async fn </span>write_config(state: <span class="kw-2">&amp;</span>State) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span>name = state.config.dhcp.interface.deref();
+    <span class="kw">let </span>(name, <span class="kw">_</span>) = find_network(state.config.hosts.listen_on)<span class="question-mark">?</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>dnsmasq_conf = File::create(state.storage_dir.join(<span class="string">"dnsmasq.conf"</span>))<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>dhcp_dynamic_conf = <span class="kw">match </span>state.config.dhcp.mode {
-        DhcpMode::Static(low, high) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{low},{high}"</span>),
-        DhcpMode::Proxy(ip) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{},proxy"</span>, ip),
+    <span class="kw">let </span>dhcp_dynamic_conf = <span class="kw">match </span>state.config.hosts.static_dhcp {
+        <span class="prelude-val">Some</span>((low, high)) =&gt; <span class="macro">format!</span>(<span class="string">"dhcp-range=tag:netboot,{low},{high}"</span>),
+        <span class="prelude-val">None </span>=&gt; <span class="macro">format!</span>(
+            <span class="string">"dhcp-range=tag:netboot,{},proxy"</span>,
+            state.config.hosts.listen_on
+        ),
     };
 
     <span class="macro">write!</span>(
@@ -264,7 +269,8 @@ dhcp-vendorclass=set:netboot,pixie
             ))
             .arg(<span class="string">"--log-dhcp"</span>)
             .arg(<span class="string">"--no-daemon"</span>)
-            .spawn()<span class="question-mark">?</span>,
+            .spawn()
+            .context(<span class="string">"Failed to start dnsmasq"</span>)<span class="question-mark">?</span>,
     };
 
     <span class="kw">loop </span>{

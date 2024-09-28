@@ -38,6 +38,12 @@
 <a href="#38" id="38">38</a>
 <a href="#39" id="39">39</a>
 <a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
+<a href="#46" id="46">46</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     net::{IpAddr, Ipv4Addr},
     time::SystemTime,
@@ -60,7 +66,13 @@
         <span class="kw">let </span>IpAddr::V4(peer_ip) = peer_addr.ip() <span class="kw">else </span>{
             <span class="macro">bail!</span>(<span class="string">"IPv6 is not supported"</span>)
         };
-        <span class="kw">let </span>peer_mac = find_mac(peer_ip)<span class="question-mark">?</span>;
+        <span class="kw">let </span>peer_mac = <span class="kw">match </span>find_mac(peer_ip) {
+            <span class="prelude-val">Ok</span>(peer_mac) =&gt; peer_mac,
+            <span class="prelude-val">Err</span>(err) =&gt; {
+                <span class="macro">log::error!</span>(<span class="string">"Error handling ping packet: {}"</span>, err);
+                <span class="kw">continue</span>;
+            }
+        };
 
         state.units.send_if_modified(|units| {
             <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{

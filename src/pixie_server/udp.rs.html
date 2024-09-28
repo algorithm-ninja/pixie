@@ -219,8 +219,6 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
-<a href="#222" id="222">222</a>
-<a href="#223" id="223">223</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::BTreeSet,
     fs,
@@ -236,9 +234,10 @@
 
 <span class="kw">use </span>anyhow::{anyhow, bail, ensure, <span class="prelude-ty">Result</span>};
 
-<span class="kw">use </span>pixie_shared::{DhcpMode, HintPacket, Station, UdpRequest, ACTION_PORT, BODY_LEN, PACKET_LEN};
-
 <span class="kw">use crate</span>::{find_mac, find_network, state::State};
+<span class="kw">use </span>pixie_shared::{
+    HintPacket, Station, UdpRequest, ACTION_PORT, BODY_LEN, CHUNKS_PORT, HINT_PORT, PACKET_LEN,
+};
 
 <span class="kw">async fn </span>broadcast_chunks(
     state: <span class="kw-2">&amp;</span>State,
@@ -291,7 +290,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>xor = [[<span class="number">0</span>; BODY_LEN]; <span class="number">32</span>];
 
             <span class="kw">let </span>hosts_cfg = <span class="kw-2">&amp;</span>state.config.hosts;
-            <span class="kw">let </span>chunks_addr = SocketAddrV4::new(ip, hosts_cfg.chunks_port);
+            <span class="kw">let </span>chunks_addr = SocketAddrV4::new(ip, CHUNKS_PORT);
 
             <span class="kw">for </span>index <span class="kw">in </span><span class="number">0</span>..num_packets {
                 write_buf[<span class="number">32</span>..<span class="number">34</span>].clone_from_slice(<span class="kw-2">&amp;</span>(index <span class="kw">as </span>u16).to_le_bytes());
@@ -309,7 +308,7 @@
                 <span class="kw">let </span>sent_len = socket.send_to(<span class="kw-2">&amp;</span>write_buf[..<span class="number">34 </span>+ len], chunks_addr).<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="macro">ensure!</span>(sent_len == <span class="number">34 </span>+ len, <span class="string">"Could not send packet"</span>);
                 wait_for +=
-                    <span class="number">8 </span>* (sent_len <span class="kw">as </span>u32) * Duration::from_secs(<span class="number">1</span>) / hosts_cfg.bits_per_second;
+                    <span class="number">8 </span>* (sent_len <span class="kw">as </span>u32) * Duration::from_secs(<span class="number">1</span>) / hosts_cfg.broadcast_speed;
             }
 
             <span class="kw">for </span>(index, body) <span class="kw">in </span>xor.iter().enumerate().take(num_packets) {
@@ -321,7 +320,7 @@
                 <span class="kw">let </span>sent_len = socket.send_to(<span class="kw-2">&amp;</span>write_buf[..<span class="number">34 </span>+ len], chunks_addr).<span class="kw">await</span><span class="question-mark">?</span>;
                 <span class="macro">ensure!</span>(sent_len == <span class="number">34 </span>+ len, <span class="string">"Could not send packet"</span>);
                 wait_for +=
-                    <span class="number">8 </span>* (sent_len <span class="kw">as </span>u32) * Duration::from_secs(<span class="number">1</span>) / hosts_cfg.bits_per_second;
+                    <span class="number">8 </span>* (sent_len <span class="kw">as </span>u32) * Duration::from_secs(<span class="number">1</span>) / hosts_cfg.broadcast_speed;
             }
         }
     }
@@ -377,7 +376,7 @@
             groups: state.config.groups.clone(),
         };
         <span class="kw">let </span>data = postcard::to_allocvec(<span class="kw-2">&amp;</span>hint)<span class="question-mark">?</span>;
-        <span class="kw">let </span>hint_addr = SocketAddrV4::new(ip, state.config.hosts.hint_port);
+        <span class="kw">let </span>hint_addr = SocketAddrV4::new(ip, HINT_PORT);
         socket.send_to(<span class="kw-2">&amp;</span>data, hint_addr).<span class="kw">await</span><span class="question-mark">?</span>;
         time::sleep(Duration::from_secs(<span class="number">1</span>)).<span class="kw">await</span>;
     }
@@ -426,10 +425,7 @@
 }
 
 <span class="kw">pub async fn </span>main(state: <span class="kw-2">&amp;</span>State) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span>network = find_network(<span class="kw">match </span>state.config.dhcp.mode {
-        DhcpMode::Static(low, <span class="kw">_</span>) =&gt; low,
-        DhcpMode::Proxy(ip) =&gt; ip,
-    })<span class="question-mark">?</span>;
+    <span class="kw">let </span>(<span class="kw">_</span>, network) = find_network(state.config.hosts.listen_on)<span class="question-mark">?</span>;
 
     <span class="kw">let </span>(tx, rx) = mpsc::channel(<span class="number">128</span>);
     <span class="kw">let </span>socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, ACTION_PORT)).<span class="kw">await</span><span class="question-mark">?</span>;

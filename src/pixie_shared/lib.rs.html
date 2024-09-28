@@ -134,6 +134,10 @@
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
 </pre></div><pre class="rust"><code><span class="attr">#![cfg_attr(not(feature = <span class="string">"std"</span>), no_std)]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -154,6 +158,10 @@
 <span class="kw">pub const </span>CHUNK_SIZE: usize = <span class="number">1 </span>&lt;&lt; <span class="number">22</span>;
 
 <span class="kw">pub const </span>ACTION_PORT: u16 = <span class="number">25640</span>;
+
+<span class="kw">pub const </span>CHUNKS_PORT: u16 = <span class="number">4041</span>;
+<span class="kw">pub const </span>HINT_PORT: u16 = <span class="number">4042</span>;
+<span class="kw">pub const </span>PING_PORT: u16 = <span class="number">4043</span>;
 
 <span class="doccomment">/// The hash of a chunk of a disk.
 ///
@@ -232,9 +240,9 @@
 <span class="attr">#[derive(Debug, Clone, Serialize, Deserialize)]
 </span><span class="kw">pub enum </span>Action {
     Reboot,
-    Register { hint_port: u16 },
+    Register,
     Push { image: String },
-    Pull { image: String, chunks_port: u16 },
+    Pull { image: String },
     Wait,
 }
 

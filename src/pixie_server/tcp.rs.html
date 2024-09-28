@@ -199,6 +199,9 @@
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     io::ErrorKind,
     net::SocketAddr,
@@ -265,7 +268,7 @@
                             col: station.col,
                             curr_action: <span class="prelude-val">None</span>,
                             curr_progress: <span class="prelude-val">None</span>,
-                            next_action: state.config.boot.default,
+                            next_action: ActionKind::Register,
                             image: station.image,
                             last_ping_timestamp: <span class="number">0</span>,
                             last_ping_msg: Vec::new(),
@@ -320,22 +323,19 @@
                         action_kind = unit.next_action;
                     }
                     <span class="prelude-val">None </span>=&gt; {
-                        action_kind = state.config.boot.unregistered;
+                        action_kind = ActionKind::Register;
                         modified = <span class="bool-val">false</span>;
                     }
                 }
 
                 action = <span class="kw">match </span>action_kind {
                     ActionKind::Reboot =&gt; Action::Reboot,
-                    ActionKind::Register =&gt; Action::Register {
-                        hint_port: state.config.hosts.hint_port,
-                    },
+                    ActionKind::Register =&gt; Action::Register,
                     ActionKind::Push =&gt; Action::Push {
                         image: unit.unwrap().image.clone(),
                     },
                     ActionKind::Pull =&gt; Action::Pull {
                         image: unit.unwrap().image.clone(),
-                        chunks_port: state.config.hosts.chunks_port,
                     },
                     ActionKind::Wait =&gt; Action::Wait,
                 };
@@ -370,7 +370,13 @@
     <span class="kw">let </span>IpAddr::V4(peer_ip) = peer_addr.ip() <span class="kw">else </span>{
         <span class="macro">bail!</span>(<span class="string">"IPv6 is not supported"</span>)
     };
-    <span class="kw">let </span>peer_mac = find_mac(peer_ip)<span class="question-mark">?</span>;
+    <span class="kw">let </span>peer_mac = <span class="kw">match </span>find_mac(peer_ip) {
+        <span class="prelude-val">Ok</span>(peer_mac) =&gt; peer_mac,
+        <span class="prelude-val">Err</span>(err) =&gt; {
+            <span class="macro">log::error!</span>(<span class="string">"Error handling tcp connection: {}"</span>, err);
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+        }
+    };
 
     <span class="kw">loop </span>{
         <span class="kw">let </span>len = <span class="kw">match </span>stream.read_u64_le().<span class="kw">await </span>{
