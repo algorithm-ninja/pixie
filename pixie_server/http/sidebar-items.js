@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["action","gc","image","main","ws"]};
+window.SIDEBAR_ITEMS = {"fn":["action","gc","image","main","status"]};

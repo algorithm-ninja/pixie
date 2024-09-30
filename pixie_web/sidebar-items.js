@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["GroupInfo","Images","MainView","UnitInfo","date_now","log","main","send_req"],"struct":["Bytes","GroupInfo_Props","Images_Props","UnitInfo_Props"]};
+window.SIDEBAR_ITEMS = {"fn":["App","Group","Images","main","send_req"],"struct":["AppProps","Bytes","GroupProps","ImagesProps"]};

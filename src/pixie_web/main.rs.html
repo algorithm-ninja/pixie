@@ -370,250 +370,33 @@
 <a href="#370" id="370">370</a>
 <a href="#371" id="371">371</a>
 <a href="#372" id="372">372</a>
-<a href="#373" id="373">373</a>
-<a href="#374" id="374">374</a>
-<a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a>
-<a href="#377" id="377">377</a>
-<a href="#378" id="378">378</a>
-<a href="#379" id="379">379</a>
-<a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a>
-<a href="#383" id="383">383</a>
-<a href="#384" id="384">384</a>
-<a href="#385" id="385">385</a>
-<a href="#386" id="386">386</a>
-<a href="#387" id="387">387</a>
-<a href="#388" id="388">388</a>
-<a href="#389" id="389">389</a>
-<a href="#390" id="390">390</a>
-<a href="#391" id="391">391</a>
-<a href="#392" id="392">392</a>
-<a href="#393" id="393">393</a>
-<a href="#394" id="394">394</a>
-<a href="#395" id="395">395</a>
-<a href="#396" id="396">396</a>
-<a href="#397" id="397">397</a>
-<a href="#398" id="398">398</a>
-<a href="#399" id="399">399</a>
-<a href="#400" id="400">400</a>
-<a href="#401" id="401">401</a>
-<a href="#402" id="402">402</a>
-<a href="#403" id="403">403</a>
-<a href="#404" id="404">404</a>
-<a href="#405" id="405">405</a>
-<a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a>
-<a href="#408" id="408">408</a>
-<a href="#409" id="409">409</a>
-<a href="#410" id="410">410</a>
-<a href="#411" id="411">411</a>
-<a href="#412" id="412">412</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
-<span class="kw">use </span>std::fmt;
-<span class="kw">use </span>std::net::Ipv4Addr;
-<span class="kw">use </span>std::ops::Deref;
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::{collections::HashMap, fmt, net::Ipv4Addr};
 
 <span class="kw">use </span>futures::StreamExt;
-<span class="kw">use </span>gloo_timers::future::TimeoutFuture;
-<span class="kw">use </span>pixie_shared::{Config, ImageStat, Unit, WsUpdate};
-<span class="kw">use </span>reqwasm::websocket::futures::WebSocket;
-<span class="kw">use </span>reqwasm::websocket::Message;
-<span class="kw">use </span>sycamore::futures::{spawn_local, spawn_local_scoped};
-<span class="kw">use </span>sycamore::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>wasm_bindgen::prelude::<span class="kw-2">*</span>;
-
-<span class="kw">use </span>reqwasm::http::Request;
-
-<span class="attr">#[wasm_bindgen]
-</span><span class="kw">extern </span><span class="string">"C" </span>{
-    <span class="attr">#[wasm_bindgen(js_namespace = Date, js_name = now)]
-    </span><span class="kw">fn </span>date_now() -&gt; f64;
-
-    <span class="attr">#[wasm_bindgen(js_namespace = console)]
-    </span><span class="kw">fn </span>log(s: <span class="kw-2">&amp;</span>str);
-}
+<span class="kw">use </span>leptos::<span class="kw-2">*</span>;
+<span class="kw">use </span>leptos_use::{use_preferred_dark, use_timestamp};
+<span class="kw">use </span>pixie_shared::{Config, ImageStat, StatusUpdate, Unit};
+<span class="kw">use </span>reqwest::Url;
+<span class="kw">use </span>thaw::{
+    Button, ButtonColor, ButtonGroup, ButtonVariant, GlobalStyle, Popover, PopoverPlacement,
+    PopoverTrigger, Space, Table, Theme, ThemeProvider,
+};
 
 <span class="kw">fn </span>send_req(url: String) {
+    <span class="kw">let </span>url = <span class="kw">if </span>url.starts_with(<span class="string">"http"</span>) {
+        Url::parse(<span class="kw-2">&amp;</span>url).expect(<span class="string">"invalid url"</span>)
+    } <span class="kw">else </span>{
+        <span class="kw">let </span>location = window().location();
+        Url::parse(<span class="kw-2">&amp;</span>location.href().expect(<span class="string">"no href"</span>))
+            .expect(<span class="string">"invalid href"</span>)
+            .join(<span class="kw-2">&amp;</span>url)
+            .expect(<span class="string">"invalid url"</span>)
+    };
     spawn_local(<span class="kw">async move </span>{
-        Request::get(<span class="kw-2">&amp;</span>url)
-            .send()
+        reqwest::get(url.clone())
             .<span class="kw">await
             </span>.unwrap_or_else(|<span class="kw">_</span>| <span class="macro">panic!</span>(<span class="string">"Request to {} failed"</span>, url));
     });
-}
-
-<span class="attr">#[component(inline_props)]
-</span><span class="kw">fn </span>UnitInfo&lt;G: Html&gt;(cx: Scope&lt;<span class="lifetime">'_</span>&gt;, unit: Unit, hostname: <span class="prelude-ty">Option</span>&lt;String&gt;) -&gt; View&lt;G&gt; {
-    <span class="kw">let </span>time = create_signal::&lt;i64&gt;(cx, (date_now() * <span class="number">0.001</span>) <span class="kw">as </span>i64);
-
-    spawn_local_scoped(cx, <span class="kw">async move </span>{
-        <span class="kw">loop </span>{
-            <span class="kw">let </span>now = date_now() <span class="kw">as </span>i64;
-            TimeoutFuture::new(<span class="number">1000 </span>- (now % <span class="number">1000</span>) <span class="kw">as </span>u32).<span class="kw">await</span>;
-            time.set(now / <span class="number">1000</span>);
-        }
-    });
-
-    <span class="kw">let </span>ping_time = unit.last_ping_timestamp <span class="kw">as </span>i64;
-    <span class="kw">let </span>ping_ago = <span class="kw">move </span>|| <span class="kw-2">*</span>time.get() - ping_time;
-
-    <span class="kw">let </span>fmt_ca = <span class="kw">move </span>|unit: <span class="kw-2">&amp;</span>Unit| {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(a) = unit.curr_action {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>((x, y)) = unit.curr_progress {
-                <span class="macro">format!</span>(<span class="string">"{} ({}/{})"</span>, a, x, y)
-            } <span class="kw">else </span>{
-                a.to_string()
-            }
-        } <span class="kw">else </span>{
-            <span class="macro">format!</span>(
-                <span class="string">"ping: {} seconds ago, {}"</span>,
-                ping_ago(),
-                String::from_utf8_lossy(<span class="kw-2">&amp;</span>unit.last_ping_msg)
-            )
-        }
-    };
-
-    <span class="kw">let </span>led_class = <span class="kw">move </span>|| <span class="kw">match </span>ping_ago() {
-        ..=-<span class="number">1 </span>=&gt; <span class="string">"led-blue"</span>,
-        <span class="number">0</span>..=<span class="number">119 </span>=&gt; <span class="string">"led-green"</span>,
-        <span class="number">120</span>..=<span class="number">299 </span>=&gt; <span class="string">"led-yellow"</span>,
-        <span class="number">300</span>.. =&gt; <span class="string">"led-red"</span>,
-    };
-
-    <span class="kw">let </span>mac = unit.mac.to_string();
-    <span class="kw">let </span>mac_nocolon = mac.replace(<span class="string">':'</span>, <span class="string">""</span>);
-
-    <span class="kw">let </span>id_pull = <span class="macro">format!</span>(<span class="string">"machine-{mac_nocolon}-pull"</span>);
-    <span class="kw">let </span>url_pull = <span class="macro">format!</span>(<span class="string">"/admin/action/{mac}/pull"</span>);
-    <span class="kw">let </span>id_push = <span class="macro">format!</span>(<span class="string">"machine-{mac_nocolon}-push"</span>);
-    <span class="kw">let </span>url_push = <span class="macro">format!</span>(<span class="string">"/admin/action/{mac}/push"</span>);
-    <span class="kw">let </span>id_boot = <span class="macro">format!</span>(<span class="string">"machine-{mac_nocolon}-boot"</span>);
-    <span class="kw">let </span>url_boot = <span class="macro">format!</span>(<span class="string">"/admin/action/{mac}/reboot"</span>);
-    <span class="kw">let </span>id_cancel = <span class="macro">format!</span>(<span class="string">"machine-{mac_nocolon}-cancel"</span>);
-    <span class="kw">let </span>url_cancel = <span class="macro">format!</span>(<span class="string">"/admin/action/{mac}/wait"</span>);
-    <span class="kw">let </span>id_register = <span class="macro">format!</span>(<span class="string">"machine-{mac_nocolon}-register"</span>);
-    <span class="kw">let </span>url_register = <span class="macro">format!</span>(<span class="string">"/admin/action/{mac}/register"</span>);
-
-    <span class="kw">let </span>image = unit.image.clone();
-    <span class="macro">view!</span> { cx,
-        tr {
-            td {
-                div(class=<span class="macro">format!</span>(<span class="string">"{} tooltip"</span>, led_class())) {
-                    span(class=<span class="string">"tooltiptext"</span>) { (ping_ago()) <span class="string">" seconds ago" </span>}
-                }
-            }
-            td { (hostname.clone().unwrap_or_default()) }
-            td { (unit.mac) }
-            td { (image) }
-            td { <span class="string">"row " </span>(unit.row) <span class="string">" col " </span>(unit.col) }
-            td { (unit.next_action) }
-            td {
-                button(id=id_pull, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull.clone()) ) {
-                    <span class="string">"flash"
-                </span>}
-            }
-            td {
-                button(id=id_push, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_push.clone()) ) {
-                    <span class="string">"store"
-                </span>}
-            }
-            td {
-                button(id=id_boot, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot.clone()) ) {
-                    <span class="string">"reboot"
-                </span>}
-            }
-            td {
-                button(id=id_cancel, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel.clone()) ) {
-                    <span class="string">"wait"
-                </span>}
-            }
-            td {
-                button(id=id_register, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_register.clone()) ) {
-                    <span class="string">"re-register"
-                </span>}
-            }
-            td { (fmt_ca(<span class="kw-2">&amp;</span>unit)) }
-        }
-    }
-}
-
-<span class="attr">#[component(inline_props)]
-</span><span class="kw">fn </span>GroupInfo&lt;<span class="lifetime">'a</span>, G: Html&gt;(
-    cx: Scope&lt;<span class="lifetime">'a</span>&gt;,
-    units: Vec&lt;Unit&gt;,
-    group_id: u8,
-    group_name: String,
-    images: Vec&lt;String&gt;,
-    hostmap: HashMap&lt;Ipv4Addr, String&gt;,
-) -&gt; View&lt;G&gt; {
-    <span class="kw">let </span>group_units = create_memo(cx, <span class="kw">move </span>|| {
-        <span class="kw">let </span><span class="kw-2">mut </span>units = units
-            .iter()
-            .filter(|x| x.group == group_id)
-            .cloned()
-            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
-        units.sort_by_key(|x| (x.row, x.col, x.mac));
-        units
-    });
-
-    <span class="kw">let </span>id_pull = <span class="macro">format!</span>(<span class="string">"group-{group_name}-pull"</span>);
-    <span class="kw">let </span>url_pull = <span class="macro">format!</span>(<span class="string">"/admin/action/{group_name}/pull"</span>);
-    <span class="kw">let </span>id_boot = <span class="macro">format!</span>(<span class="string">"group-{group_name}-boot"</span>);
-    <span class="kw">let </span>url_boot = <span class="macro">format!</span>(<span class="string">"/admin/action/{group_name}/reboot"</span>);
-    <span class="kw">let </span>id_cancel = <span class="macro">format!</span>(<span class="string">"group-{group_name}-cancel"</span>);
-    <span class="kw">let </span>url_cancel = <span class="macro">format!</span>(<span class="string">"/admin/action/{group_name}/wait"</span>);
-
-    <span class="kw">let </span>set_images = View::new_fragment(
-        images
-            .iter()
-            .map(|image| {
-                <span class="kw">let </span>url = <span class="macro">format!</span>(<span class="string">"/admin/image/{group_name}/{image}"</span>);
-                <span class="kw">let </span>text = <span class="macro">format!</span>(<span class="string">"Set image to {:?}"</span>, image);
-                <span class="macro">view!</span> { cx,
-                    button(on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url.clone())) {
-                        (text)
-                    }
-                }
-            })
-            .collect(),
-    );
-
-    <span class="macro">view!</span> { cx,
-        h2 { (group_name) }
-        button(id=id_pull, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull.clone()) ) {
-            <span class="string">"Pull image on all machines"
-        </span>}
-        button(id=id_boot, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot.clone()) ) {
-            <span class="string">"Set all machines to boot into the OS"
-        </span>}
-        button(id=id_cancel, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel.clone()) ) {
-            <span class="string">"Set all machines to wait for next command"
-        </span>}
-        (set_images)
-        table {
-            tr {
-                th { }
-                th { <span class="string">"hostname" </span>}
-                th { <span class="string">"mac" </span>}
-                th { <span class="string">"image" </span>}
-                th { <span class="string">"position" </span>}
-                th { <span class="string">"next action" </span>}
-                th(colspan=<span class="number">5</span>) { <span class="string">"change action" </span>}
-                th { <span class="string">"current action" </span>}
-            }
-            Indexed(
-                iterable=group_units,
-                view=<span class="kw">move </span>|cx, x| {
-                    <span class="kw">let </span>hostname = hostmap.get(<span class="kw-2">&amp;</span>x.static_ip()).cloned();
-                    <span class="macro">view!</span> { cx,
-                        UnitInfo(unit=x, hostname=hostname)
-                    }
-                },
-            )
-        }
-    }
 }
 
 <span class="kw">struct </span>Bytes(u64);
@@ -632,194 +415,331 @@
     }
 }
 
-<span class="attr">#[component(inline_props)]
-</span><span class="kw">fn </span>Images&lt;<span class="lifetime">'a</span>, G: Html&gt;(cx: Scope&lt;<span class="lifetime">'a</span>&gt;, images_signal: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>ReadSignal&lt;<span class="prelude-ty">Option</span>&lt;ImageStat&gt;&gt;) -&gt; View&lt;G&gt; {
-    <span class="kw">let </span>make_image_row = <span class="kw">move </span>|name: String, image: (u64, u64)| {
-        <span class="kw">let </span>id_pull = <span class="macro">format!</span>(<span class="string">"image-{name}-pull"</span>);
-        <span class="kw">let </span>url_pull = <span class="macro">format!</span>(<span class="string">"/admin/action/{name}/pull"</span>);
-        <span class="kw">let </span>id_boot = <span class="macro">format!</span>(<span class="string">"image-{name}-boot"</span>);
-        <span class="kw">let </span>url_boot = <span class="macro">format!</span>(<span class="string">"/admin/action/{name}/reboot"</span>);
-        <span class="kw">let </span>id_cancel = <span class="macro">format!</span>(<span class="string">"image-{name}-cancel"</span>);
-        <span class="kw">let </span>url_cancel = <span class="macro">format!</span>(<span class="string">"/admin/action/{name}/wait"</span>);
-        <span class="macro">view!</span> { cx, tr {
-            td { (name) }
-            td { (Bytes(image.<span class="number">0</span>)) }
-            td { (Bytes(image.<span class="number">1</span>)) }
-            td {
-                button(id=id_pull, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull.clone()) ) {
-                    <span class="string">"Pull image on all machines"
-                </span>}
-            }
-            td {
-                button(id=id_boot, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot.clone()) ) {
-                    <span class="string">"Set all machines to boot into the OS"
-                </span>}
-            }
-            td {
-                button(id=id_cancel, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel.clone()) ) {
-                    <span class="string">"Set all machines to wait for next command"
-                </span>}
-            }
-          }
+<span class="attr">#[component]
+</span><span class="kw">fn </span>Images(<span class="attr">#[prop(into)] </span>images: Signal&lt;<span class="prelude-ty">Option</span>&lt;ImageStat&gt;&gt;) -&gt; <span class="kw">impl </span>IntoView {
+    <span class="kw">let </span>image_row = <span class="kw">move </span>|(name, image): (String, (u64, u64))| {
+        <span class="kw">let </span>url_pull = <span class="macro">format!</span>(<span class="string">"admin/action/{name}/pull"</span>);
+        <span class="kw">let </span>url_boot = <span class="macro">format!</span>(<span class="string">"admin/action/{name}/reboot"</span>);
+        <span class="kw">let </span>url_cancel = <span class="macro">format!</span>(<span class="string">"admin/action/{name}/wait"</span>);
+        <span class="macro">view!</span> {
+            &lt;tr&gt;
+                &lt;td&gt;{name}&lt;/td&gt;
+                &lt;td&gt;{Bytes(image.<span class="number">0</span>).to_string()}&lt;/td&gt;
+                &lt;td&gt;{Bytes(image.<span class="number">1</span>).to_string()}&lt;/td&gt;
+                &lt;td&gt;
+                    &lt;ButtonGroup&gt;
+                        &lt;Button
+                            color=ButtonColor::Error
+                            on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull.clone())
+                        &gt;
+                            <span class="string">"Flash all machines"
+                        </span>&lt;/Button&gt;
+                        &lt;Button
+                            color=ButtonColor::Success
+                            on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot.clone())
+                        &gt;
+                            <span class="string">"Set all machines to boot into the OS"
+                        </span>&lt;/Button&gt;
+                        &lt;Button
+                            color=ButtonColor::Primary
+                            on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel.clone())
+                        &gt;
+                            <span class="string">"Set all machines to wait for next command"
+                        </span>&lt;/Button&gt;
+                    &lt;/ButtonGroup&gt;
+                &lt;/td&gt;
+            &lt;/tr&gt;
         }
     };
 
-    <span class="kw">let </span>images_table = <span class="kw">move </span>|| {
-        View::new_fragment(
-            images_signal
-                .get()
-                .deref()
-                .as_ref()
-                .map(|images| {
-                    images
-                        .images
-                        .iter()
-                        .map(|(name, image)| make_image_row(name.clone(), <span class="kw-2">*</span>image))
-                        .collect()
-                })
-                .unwrap_or_default(),
-        )
-    };
+    <span class="kw">let </span>total_csize = <span class="kw">move </span>|| images.get().as_ref().map(|images| images.total_csize);
 
-    <span class="kw">let </span>total_csize = <span class="kw">move </span>|| {
-        images_signal
-            .get()
-            .deref()
-            .as_ref()
-            .map(|images| images.total_csize)
-    };
+    <span class="kw">let </span>reclaimable = <span class="kw">move </span>|| images.get().as_ref().map(|images| images.reclaimable);
 
-    <span class="kw">let </span>reclaimable = <span class="kw">move </span>|| {
-        images_signal
-            .get()
-            .deref()
-            .as_ref()
-            .map(|images| images.reclaimable)
-    };
-
-    <span class="macro">view!</span> { cx,
-        h1 { <span class="string">"Images" </span>}
-        table {
-            tr {
-                th { <span class="string">"Image" </span>}
-                th { <span class="string">"Size" </span>}
-                th { <span class="string">"Compressed" </span>}
-            }
-            (images_table())
-            tr {
-                td { <span class="string">"Total" </span>}
-                td { (Bytes(total_csize().unwrap_or_default())) }
-            }
-            tr {
-                td { <span class="string">"Reclaimable" </span>}
-                td { (Bytes(reclaimable().unwrap_or_default())) }
-                td { }
-                td {
-                    button(id=<span class="string">"reclaime"</span>, on:click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(<span class="string">"/admin/gc"</span>.into()) ) {
+    <span class="macro">view!</span> {
+        &lt;h1&gt;<span class="string">"Images"</span>&lt;/h1&gt;
+        &lt;Table&gt;
+            &lt;tr&gt;
+                &lt;th&gt;<span class="string">"Image"</span>&lt;/th&gt;
+                &lt;th&gt;<span class="string">"Size"</span>&lt;/th&gt;
+                &lt;th&gt;<span class="string">"Compressed"</span>&lt;/th&gt;
+                &lt;th&gt;&lt;/th&gt;
+            &lt;/tr&gt;
+            &lt;For
+                each=<span class="kw">move </span>|| images.get().map(|x| x.images.clone()).unwrap_or_default()
+                key=|x| x.clone()
+                children=image_row
+            /&gt;
+            &lt;tr&gt;
+                &lt;td&gt;<span class="string">"Total"</span>&lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| Bytes(total_csize().unwrap_or_default()).to_string()}&lt;/td&gt;
+                &lt;td&gt;&lt;/td&gt;
+            &lt;/tr&gt;
+            &lt;tr&gt;
+                &lt;td&gt;<span class="string">"Reclaimable"</span>&lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| Bytes(reclaimable().unwrap_or_default()).to_string()}&lt;/td&gt;
+                &lt;td&gt;&lt;/td&gt;
+                &lt;td&gt;
+                    &lt;Button
+                        color=ButtonColor::Primary
+                        on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(<span class="string">"/admin/gc"</span>.into())
+                    &gt;
                         <span class="string">"Reclaim disk space"
-                    </span>}
-                }
-            }
-        }
+                    </span>&lt;/Button&gt;
+                &lt;/td&gt;
+            &lt;/tr&gt;
+        &lt;/Table&gt;
     }
 }
 
 <span class="attr">#[component]
-</span><span class="kw">async fn </span>MainView&lt;G: Html&gt;(cx: Scope&lt;<span class="lifetime">'_</span>&gt;) -&gt; View&lt;G&gt; {
-    <span class="kw">let </span>config_signal = create_signal(cx, <span class="prelude-val">None</span>::&lt;Config&gt;);
-    <span class="kw">let </span>hostmap_signal = create_signal(cx, <span class="prelude-val">None</span>::&lt;HashMap&lt;Ipv4Addr, String&gt;&gt;);
-    <span class="kw">let </span>units_signal = create_signal(cx, <span class="prelude-val">None</span>::&lt;Vec&lt;Unit&gt;&gt;);
-    <span class="kw">let </span>images_signal = create_signal(cx, <span class="prelude-val">None</span>::&lt;ImageStat&gt;);
+</span><span class="kw">fn </span>Group(
+    <span class="attr">#[prop(into)] </span>units: Signal&lt;Vec&lt;Unit&gt;&gt;,
+    <span class="attr">#[prop(into)] </span>group_name: Signal&lt;String&gt;,
+    images: Signal&lt;Vec&lt;String&gt;&gt;,
+    hostmap: Signal&lt;HashMap&lt;Ipv4Addr, String&gt;&gt;,
+    <span class="attr">#[prop(into)] </span>time: Signal&lt;i64&gt;,
+) -&gt; <span class="kw">impl </span>IntoView {
+    <span class="kw">let </span>render_unit = <span class="kw">move </span>|idx: usize| {
+        <span class="kw">let </span>unit = create_memo(<span class="kw">move </span>|<span class="kw">_</span>| units.get()[idx].clone());
+        <span class="kw">let </span>ping_ago = <span class="kw">move </span>|| time.get() - unit.get().last_ping_timestamp <span class="kw">as </span>i64;
 
-    spawn_local_scoped(cx, <span class="kw">async move </span>{
-        <span class="kw">let </span>url = <span class="macro">format!</span>(
-            <span class="string">"ws://{}/admin/ws"</span>,
-            web_sys::window().unwrap().location().host().unwrap()
-        );
+        <span class="kw">let </span>mac = <span class="kw">move </span>|| unit.get().mac.to_string();
+        <span class="kw">let </span>url_pull = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/pull"</span>, mac());
+        <span class="kw">let </span>url_push = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/push"</span>, mac());
+        <span class="kw">let </span>url_boot = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/reboot"</span>, mac());
+        <span class="kw">let </span>url_cancel = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/wait"</span>, mac());
+        <span class="kw">let </span>url_register = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/register"</span>, mac());
 
-        <span class="kw">let </span><span class="kw-2">mut </span>ws = WebSocket::open(<span class="kw-2">&amp;</span>url).unwrap_or_else(|err| {
-            log(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"Failed to open websocket: {:?}"</span>, err));
-            <span class="macro">panic!</span>();
-        });
-
-        <span class="kw">loop </span>{
-            <span class="kw">let </span>msg = ws
-                .next()
-                .<span class="kw">await
-                </span>.unwrap_or_else(|| {
-                    log(<span class="string">"Websocket closed"</span>);
-                    <span class="macro">panic!</span>();
-                })
-                .unwrap_or_else(|err| {
-                    log(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"Websocket error: {:?}"</span>, err));
-                    <span class="macro">panic!</span>();
-                });
-
-            <span class="kw">match </span>msg {
-                Message::Text(text) =&gt; {
-                    <span class="kw">let </span>update: WsUpdate = serde_json::from_str(<span class="kw-2">&amp;</span>text).unwrap_or_else(|err| {
-                        log(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"Failed to parse websocket message: {:?}"</span>, err));
-                        <span class="macro">panic!</span>();
-                    });
-
-                    <span class="kw">match </span>update {
-                        WsUpdate::Config(config) =&gt; {
-                            config_signal.set(<span class="prelude-val">Some</span>(config));
-                        }
-                        WsUpdate::HostMap(hostmap) =&gt; {
-                            hostmap_signal.set(<span class="prelude-val">Some</span>(hostmap));
-                        }
-                        WsUpdate::Units(units) =&gt; {
-                            units_signal.set(<span class="prelude-val">Some</span>(units));
-                        }
-                        WsUpdate::ImageStats(images) =&gt; {
-                            images_signal.set(<span class="prelude-val">Some</span>(images));
-                        }
-                    }
+        <span class="kw">let </span>fmt_ca = <span class="kw">move </span>|| {
+            <span class="kw">let </span>unit = unit.get();
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(a) = unit.curr_action {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((x, y)) = unit.curr_progress {
+                    <span class="macro">format!</span>(<span class="string">"{} ({}/{})"</span>, a, x, y)
+                } <span class="kw">else </span>{
+                    a.to_string()
                 }
-                Message::Bytes(<span class="kw">_</span>) =&gt; {
-                    <span class="macro">panic!</span>(<span class="string">"Unexpected binary message"</span>)
-                }
+            } <span class="kw">else </span>{
+                <span class="macro">format!</span>(
+                    <span class="string">"ping: {} seconds ago, {}"</span>,
+                    ping_ago(),
+                    String::from_utf8_lossy(<span class="kw-2">&amp;</span>unit.last_ping_msg)
+                )
             }
+        };
+
+        <span class="kw">let </span>led_class = <span class="kw">move </span>|| <span class="kw">match </span>ping_ago() {
+            ..=-<span class="number">1 </span>=&gt; <span class="string">"led-blue"</span>,
+            <span class="number">0</span>..=<span class="number">119 </span>=&gt; <span class="string">"led-green"</span>,
+            <span class="number">120</span>..=<span class="number">299 </span>=&gt; <span class="string">"led-yellow"</span>,
+            <span class="number">300</span>.. =&gt; <span class="string">"led-red"</span>,
+        };
+        <span class="macro">view!</span> {
+            &lt;tr&gt;
+                &lt;td&gt;
+                    &lt;Popover tooltip=<span class="bool-val">true </span>placement=PopoverPlacement::Right&gt;
+                        &lt;PopoverTrigger slot&gt;
+                            &lt;div class=led_class&gt;&lt;/div&gt;
+                        &lt;/PopoverTrigger&gt;
+                        {<span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"{} seconds ago"</span>, ping_ago())}
+                    &lt;/Popover&gt;
+                &lt;/td&gt;
+                &lt;td&gt;
+                    {<span class="kw">move </span>|| {
+                        hostmap.get().get(<span class="kw-2">&amp;</span>unit.get().static_ip()).cloned().unwrap_or_default()
+                    }}
+                &lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| unit.get().mac.to_string()}&lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| unit.get().image}&lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"row {} col {}"</span>, unit.get().row, unit.get().col)}&lt;/td&gt;
+                &lt;td&gt;{<span class="kw">move </span>|| unit.get().next_action.to_string()}&lt;/td&gt;
+                &lt;td&gt;
+                    &lt;ButtonGroup&gt;
+                        &lt;Button color=ButtonColor::Error on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull())&gt;
+                            <span class="string">"flash"
+                        </span>&lt;/Button&gt;
+                        &lt;Button color=ButtonColor::Warning on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_push())&gt;
+                            <span class="string">"store"
+                        </span>&lt;/Button&gt;
+                        &lt;Button color=ButtonColor::Success on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot())&gt;
+                            <span class="string">"reboot"
+                        </span>&lt;/Button&gt;
+                        &lt;Button color=ButtonColor::Primary on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel())&gt;
+                            <span class="string">"wait"
+                        </span>&lt;/Button&gt;
+                        &lt;Button
+                            variant=ButtonVariant::Outlined
+                            on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_register())
+                        &gt;
+                            <span class="string">"re-register"
+                        </span>&lt;/Button&gt;
+                    &lt;/ButtonGroup&gt;
+                &lt;/td&gt;
+                &lt;td class=<span class="string">"expand"</span>&gt;{fmt_ca}&lt;/td&gt;
+            &lt;/tr&gt;
         }
-    });
-
-    <span class="kw">let </span>groups = <span class="kw">move </span>|| {
-        <span class="kw">let </span>config_opt = config_signal.get().deref().clone();
-        <span class="kw">let </span>units_opt = units_signal.get().deref().clone();
-
-        View::new_fragment(
-            config_opt
-                .zip(units_opt)
-                .map(|(config, units)| {
-                    config.groups
-                        .iter()
-                        .map(|(name, id)| {
-                            <span class="kw">let </span>units = units.clone();
-                            <span class="kw">let </span>images = config.images.clone();
-                            <span class="kw">let </span>hostmap = hostmap_signal.get().deref().clone().unwrap_or_default();
-                            <span class="macro">view!</span> { cx,
-                            GroupInfo(units=units, group_id=<span class="kw-2">*</span>id, group_name=name.clone(), images=images, hostmap=hostmap) }
-                        })
-                        .collect()
-                })
-                .unwrap_or_default()
-        )
+        .into_view()
     };
 
-    <span class="macro">view!</span> { cx,
-        Images(images_signal=images_signal)
+    <span class="kw">let </span>url_pull = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/pull"</span>, group_name.get());
+    <span class="kw">let </span>url_boot = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/reboot"</span>, group_name.get());
+    <span class="kw">let </span>url_cancel = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/action/{}/wait"</span>, group_name.get());
 
-        h1 { <span class="string">"Groups" </span>}
-        (groups())
+    <span class="kw">let </span>image_button = <span class="kw">move </span>|image: String| {
+        <span class="kw">let </span>text = <span class="macro">format!</span>(<span class="string">"Set image to {:?}"</span>, image);
+        <span class="kw">let </span>url = <span class="kw">move </span>|| <span class="macro">format!</span>(<span class="string">"admin/image/{}/{}"</span>, group_name.get(), image);
+        <span class="macro">view!</span> {
+            &lt;Button color=ButtonColor::Error on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url())&gt;
+                {text}
+            &lt;/Button&gt;
+        }
+    };
+
+    <span class="macro">view!</span> {
+        &lt;h1&gt;{group_name}&lt;/h1&gt;
+        &lt;Space vertical=<span class="bool-val">true</span>&gt;
+            &lt;ButtonGroup&gt;
+                &lt;Button color=ButtonColor::Error on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_pull())&gt;
+                    <span class="string">"Flash all machines"
+                </span>&lt;/Button&gt;
+                &lt;Button color=ButtonColor::Success on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_boot())&gt;
+                    <span class="string">"Set all machines to boot into the OS"
+                </span>&lt;/Button&gt;
+                &lt;Button color=ButtonColor::Primary on_click=<span class="kw">move </span>|<span class="kw">_</span>| send_req(url_cancel())&gt;
+                    <span class="string">"Set all machines to wait for next command"
+                </span>&lt;/Button&gt;
+                &lt;For each=<span class="kw">move </span>|| images.get() key=|x| x.clone() children=image_button/&gt;
+            &lt;/ButtonGroup&gt;
+            &lt;Table&gt;
+                &lt;tr&gt;
+                    &lt;th&gt;&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"hostname"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"mac"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"image"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"position"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"next action"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"change action"</span>&lt;/th&gt;
+                    &lt;th&gt;<span class="string">"current action"</span>&lt;/th&gt;
+                &lt;/tr&gt;
+                &lt;For each=<span class="kw">move </span>|| <span class="number">0</span>..units.get().len() key=|x| <span class="kw-2">*</span>x children=render_unit/&gt;
+            &lt;/Table&gt;
+        &lt;/Space&gt;
+    }
+}
+
+<span class="attr">#[component]
+</span><span class="kw">fn </span>App() -&gt; <span class="kw">impl </span>IntoView {
+    <span class="kw">let </span>(config, set_config) = create_signal(<span class="prelude-val">None</span>::&lt;Config&gt;);
+    <span class="kw">let </span>(hostmap, set_hostname) = create_signal(<span class="prelude-val">None</span>::&lt;HashMap&lt;Ipv4Addr, String&gt;&gt;);
+    <span class="kw">let </span>(units, set_units) = create_signal(<span class="prelude-val">None</span>::&lt;Vec&lt;Unit&gt;&gt;);
+    <span class="kw">let </span>(image_stats, set_image_stats) = create_signal(<span class="prelude-val">None</span>::&lt;ImageStat&gt;);
+
+    <span class="kw">let </span>images = Signal::derive(<span class="kw">move </span>|| {
+        config
+            .get()
+            .map(|x| x.images.clone())
+            .unwrap_or_else(Vec::new)
+    });
+
+    <span class="kw">let </span>location =
+        Url::parse(<span class="kw-2">&amp;</span>window().location().href().expect(<span class="string">"no href"</span>)).expect(<span class="string">"invalid url href"</span>);
+    <span class="kw">let </span>status_url = location
+        .join(<span class="string">"admin/status"</span>)
+        .expect(<span class="string">"could not make relative URL"</span>);
+
+    <span class="kw">let </span>handle_message = <span class="kw">move </span>|msg| <span class="kw">match </span>msg {
+        StatusUpdate::Units(u) =&gt; set_units.set(<span class="prelude-val">Some</span>(u)),
+        StatusUpdate::Config(c) =&gt; set_config.set(<span class="prelude-val">Some</span>(c)),
+        StatusUpdate::HostMap(h) =&gt; set_hostname.set(<span class="prelude-val">Some</span>(h)),
+        StatusUpdate::ImageStats(i) =&gt; set_image_stats.set(<span class="prelude-val">Some</span>(i)),
+    };
+
+    spawn_local(<span class="kw">async move </span>{
+        <span class="kw">let </span>stream = reqwest::get(status_url)
+            .<span class="kw">await
+            </span>.expect(<span class="string">"could not connect to server"</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>buf = <span class="macro">vec!</span>[];
+        stream
+            .bytes_stream()
+            .for_each(|x| {
+                <span class="kw">let </span>data = x.unwrap();
+                <span class="kw">let </span><span class="kw-2">mut </span>data = <span class="kw-2">&amp;</span>data[..];
+                <span class="kw">while let </span><span class="prelude-val">Some</span>((newline_pos, <span class="kw">_</span>)) =
+                    data.iter().enumerate().find(|(<span class="kw">_</span>, x)| <span class="kw-2">**</span>x == <span class="string">b'\n'</span>)
+                {
+                    buf.extend_from_slice(<span class="kw-2">&amp;</span>data[..newline_pos]);
+                    <span class="kw">let </span>msg: StatusUpdate =
+                        serde_json::from_slice(<span class="kw-2">&amp;</span>buf).expect(<span class="string">"invalid message from server"</span>);
+                    buf.clear();
+                    handle_message(msg);
+                    data = <span class="kw-2">&amp;</span>data[newline_pos + <span class="number">1</span>..];
+                }
+                buf.extend_from_slice(data);
+
+                <span class="kw">async </span>{}
+            })
+            .<span class="kw">await</span>;
+    });
+
+    <span class="kw">let </span>time = use_timestamp();
+    <span class="kw">let </span>time_in_seconds = create_memo(<span class="kw">move </span>|<span class="kw">_</span>| (time.get() * <span class="number">0.001</span>) <span class="kw">as </span>i64);
+
+    <span class="kw">let </span>render_group = <span class="kw">move </span>|id: u8| {
+        <span class="kw">let </span>group_name = create_memo(<span class="kw">move </span>|<span class="kw">_</span>| {
+            config
+                .get()
+                .unwrap()
+                .groups
+                .get_by_second(<span class="kw-2">&amp;</span>id)
+                .unwrap()
+                .clone()
+        });
+        <span class="kw">let </span>units = create_memo(<span class="kw">move </span>|<span class="kw">_</span>| -&gt; Vec&lt;<span class="kw">_</span>&gt; {
+            units
+                .get()
+                .unwrap_or_else(Vec::new)
+                .iter()
+                .filter(|x| x.group == id)
+                .cloned()
+                .collect()
+        });
+        <span class="kw">let </span>hostmap = Signal::derive(<span class="kw">move </span>|| hostmap.get().unwrap_or_else(HashMap::new));
+        <span class="macro">view!</span> { &lt;Group units group_name images hostmap time=time_in_seconds/&gt; }.into_view()
+    };
+
+    <span class="macro">view!</span> {
+        &lt;Images images=image_stats/&gt;
+        &lt;For
+            each=<span class="kw">move </span>|| {
+                config.get().clone().into_iter().flat_map(|x| x.groups.into_iter().map(|x| x.<span class="number">1</span>))
+            }
+            key=|x| <span class="kw-2">*</span>x
+            children=render_group
+        /&gt;
     }
 }
 
 <span class="kw">fn </span>main() {
-    sycamore::render(|cx| {
-        <span class="macro">view!</span> { cx,
-            MainView {}
-        }
+    console_error_panic_hook::set_once();
+    console_log::init_with_level(log::Level::Debug).unwrap();
+
+    <span class="kw">let </span>dark_mode = use_preferred_dark();
+    <span class="kw">let </span>theme = create_rw_signal(Theme::dark());
+    create_effect(<span class="kw">move </span>|<span class="kw">_</span>| {
+        theme.set(<span class="kw">if </span>dark_mode.get() {
+            Theme::dark()
+        } <span class="kw">else </span>{
+            Theme::light()
+        })
     });
+
+    mount_to_body(<span class="kw">move </span>|| {
+        <span class="macro">view!</span> {
+            &lt;ThemeProvider theme&gt;
+                &lt;GlobalStyle /&gt;
+                &lt;App/&gt;
+            &lt;/ThemeProvider&gt;
+        }
+    })
 }
 </code></pre></div></section></main></body></html>
