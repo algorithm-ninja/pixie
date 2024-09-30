@@ -338,7 +338,7 @@
 }
 
 <span class="kw">async fn </span>gc(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; String {
-    state.gc_chunks().<span class="kw">await</span>.unwrap();
+    state.gc_chunks().unwrap();
     <span class="string">""</span>.to_owned()
 }
 

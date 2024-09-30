@@ -136,6 +136,12 @@
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>dnsmasq;
 <span class="kw">mod </span>http;
 <span class="kw">mod </span>ping;
@@ -157,6 +163,7 @@
 <span class="kw">use </span>interfaces::Interface;
 <span class="kw">use </span>ipnet::Ipv4Net;
 <span class="kw">use </span>macaddr::MacAddr6;
+<span class="kw">use </span>tokio::task::JoinHandle;
 
 <span class="kw">use </span><span class="kw">crate</span>::state::State;
 
@@ -264,13 +271,18 @@
 
     <span class="kw">let </span>state = Arc::new(State::load(options.storage_dir)<span class="question-mark">?</span>);
 
-    <span class="macro">tokio::try_join!</span>(
-        dnsmasq::main(state.clone()),
-        http::main(state.clone()),
-        udp::main(<span class="kw-2">&amp;</span>state),
-        tcp::main(state.clone()),
-        ping::main(<span class="kw-2">&amp;</span>state),
-    )<span class="question-mark">?</span>;
+    <span class="kw">async fn </span>flatten(task: JoinHandle&lt;<span class="prelude-ty">Result</span>&lt;()&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        task.<span class="kw">await</span><span class="question-mark">??</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">let </span>dnsmasq_task = flatten(tokio::spawn(dnsmasq::main(state.clone())));
+    <span class="kw">let </span>http_task = flatten(tokio::spawn(http::main(state.clone())));
+    <span class="kw">let </span>udp_task = flatten(tokio::spawn(udp::main(state.clone())));
+    <span class="kw">let </span>tcp_task = flatten(tokio::spawn(tcp::main(state.clone())));
+    <span class="kw">let </span>ping_task = flatten(tokio::spawn(ping::main(state.clone())));
+
+    <span class="macro">tokio::try_join!</span>(dnsmasq_task, http_task, udp_task, tcp_task, ping_task)<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }

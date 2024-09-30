@@ -219,11 +219,13 @@
 <a href="#219" id="219">219</a>
 <a href="#220" id="220">220</a>
 <a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::BTreeSet,
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddrV4},
     ops::Bound,
+    sync::Arc,
 };
 
 <span class="kw">use </span>tokio::{
@@ -424,7 +426,7 @@
     }
 }
 
-<span class="kw">pub async fn </span>main(state: <span class="kw-2">&amp;</span>State) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span>(<span class="kw">_</span>, network) = find_network(state.config.hosts.listen_on)<span class="question-mark">?</span>;
 
     <span class="kw">let </span>(tx, rx) = mpsc::channel(<span class="number">128</span>);
@@ -433,9 +435,9 @@
     socket.set_broadcast(<span class="bool-val">true</span>)<span class="question-mark">?</span>;
 
     <span class="macro">tokio::try_join!</span>(
-        broadcast_chunks(state, <span class="kw-2">&amp;</span>socket, network.broadcast(), rx),
-        broadcast_hint(state, <span class="kw-2">&amp;</span>socket, network.broadcast()),
-        handle_requests(state, <span class="kw-2">&amp;</span>socket, tx),
+        broadcast_chunks(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>socket, network.broadcast(), rx),
+        broadcast_hint(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>socket, network.broadcast()),
+        handle_requests(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>socket, tx),
     )<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())

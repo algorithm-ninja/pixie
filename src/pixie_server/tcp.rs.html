@@ -197,17 +197,7 @@
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::{
-    io::ErrorKind,
-    net::SocketAddr,
-    net::{IpAddr, Ipv4Addr},
-    sync::Arc,
-};
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::{io::ErrorKind, net::IpAddr, net::SocketAddr, sync::Arc};
 
 <span class="kw">use </span>tokio::{
     fs,
@@ -281,14 +271,14 @@
             Vec::new()
         }
         TcpRequest::UploadChunk(hash, data) =&gt; {
-            state.add_chunk(hash, <span class="kw-2">&amp;</span>data).<span class="kw">await</span><span class="question-mark">?</span>;
+            state.add_chunk(hash, <span class="kw-2">&amp;</span>data)<span class="question-mark">?</span>;
             Vec::new()
         }
         TcpRequest::UploadImage(name, image) =&gt; {
             <span class="kw">if </span>!state.config.images.contains(<span class="kw-2">&amp;</span>name) {
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="macro">format!</span>(<span class="string">"Unknown image: {}"</span>, name).into_bytes());
             }
-            state.add_image(name, image).<span class="kw">await</span><span class="question-mark">?</span>;
+            state.add_image(name, image)<span class="question-mark">?</span>;
 
             Vec::new()
         }
@@ -394,7 +384,7 @@
 }
 
 <span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-    <span class="kw">let </span>listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, ACTION_PORT)).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>listener = TcpListener::bind((state.config.hosts.listen_on, ACTION_PORT)).<span class="kw">await</span><span class="question-mark">?</span>;
     <span class="macro">log::info!</span>(<span class="string">"Listening on {}"</span>, listener.local_addr()<span class="question-mark">?</span>);
     <span class="kw">loop </span>{
         <span class="kw">let </span>(stream, addr) = listener.accept().<span class="kw">await</span><span class="question-mark">?</span>;
