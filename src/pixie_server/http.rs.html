@@ -196,6 +196,30 @@
 <a href="#196" id="196">196</a>
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::Ipv4Addr, sync::Arc};
 
 <span class="kw">use </span>anyhow::Result;
@@ -210,7 +234,7 @@
 <span class="kw">use </span>futures::StreamExt;
 <span class="kw">use </span>macaddr::MacAddr6;
 
-<span class="kw">use </span>pixie_shared::{HttpConfig, StatusUpdate};
+<span class="kw">use </span>pixie_shared::{HttpConfig, StatusUpdate, Unit};
 <span class="kw">use </span>tokio::net::TcpListener;
 <span class="kw">use </span>tokio_stream::wrappers::WatchStream;
 <span class="kw">use </span>tower_http::{
@@ -218,6 +242,42 @@
 };
 
 <span class="kw">use </span><span class="kw">crate</span>::state::State;
+
+<span class="kw">enum </span>UnitSelector {
+    MacAddr(MacAddr6),
+    IpAddr(Ipv4Addr),
+    All,
+    Group(u8),
+    Image(String),
+}
+
+<span class="kw">impl </span>UnitSelector {
+    <span class="kw">fn </span>parse(state: <span class="kw-2">&amp;</span>State, selector: String) -&gt; <span class="prelude-ty">Option</span>&lt;UnitSelector&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = selector.parse::&lt;MacAddr6&gt;() {
+            <span class="prelude-val">Some</span>(UnitSelector::MacAddr(mac))
+        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = selector.parse::&lt;Ipv4Addr&gt;() {
+            <span class="prelude-val">Some</span>(UnitSelector::IpAddr(ip))
+        } <span class="kw">else if </span>selector == <span class="string">"all" </span>{
+            <span class="prelude-val">Some</span>(UnitSelector::All)
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>selector) {
+            <span class="prelude-val">Some</span>(UnitSelector::Group(group))
+        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>selector) {
+            <span class="prelude-val">Some</span>(UnitSelector::Image(selector))
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+
+    <span class="kw">fn </span>select(<span class="kw-2">&amp;</span><span class="self">self</span>, unit: <span class="kw-2">&amp;</span>Unit) -&gt; bool {
+        <span class="kw">match </span><span class="self">self </span>{
+            UnitSelector::MacAddr(mac) =&gt; unit.mac == <span class="kw-2">*</span>mac,
+            UnitSelector::IpAddr(ip) =&gt; unit.static_ip() == <span class="kw-2">*</span>ip,
+            UnitSelector::All =&gt; <span class="bool-val">true</span>,
+            UnitSelector::Group(group) =&gt; unit.group == <span class="kw-2">*</span>group,
+            UnitSelector::Image(image) =&gt; unit.image == <span class="kw-2">*</span>image,
+        }
+    }
+}
 
 <span class="kw">async fn </span>action(
     Path((unit_filter, action_name)): Path&lt;(String, String)&gt;,
@@ -230,44 +290,21 @@
         );
     };
 
-    <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
+    <span class="kw">let </span><span class="prelude-val">Some</span>(unit_selector) = UnitSelector::parse(<span class="kw-2">&amp;</span>state, unit_filter) <span class="kw">else </span>{
+        <span class="kw">return </span>(
+            StatusCode::BAD_REQUEST,
+            <span class="string">"Invalid unit selector\n"</span>.to_owned(),
+        );
+    };
 
+    <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0</span>;
     state.units.send_if_modified(|units| {
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = unit_filter.parse::&lt;MacAddr6&gt;() {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.mac == mac {
-                    unit.next_action = action;
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = unit_filter.parse::&lt;Ipv4Addr&gt;() {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.static_ip() == ip {
-                    unit.next_action = action;
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if </span>unit_filter == <span class="string">"all" </span>{
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+            <span class="kw">if </span>unit_selector.select(unit) {
                 unit.next_action = action;
                 updated += <span class="number">1</span>;
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>unit_filter) {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.group == group {
-                    unit.next_action = action;
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>unit_filter) {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.image == unit_filter {
-                    unit.next_action = action;
-                    updated += <span class="number">1</span>;
-                }
-            }
         }
-
         updated &gt; <span class="number">0
     </span>});
 
@@ -289,44 +326,21 @@
         );
     }
 
-    <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0usize</span>;
+    <span class="kw">let </span><span class="prelude-val">Some</span>(unit_selector) = UnitSelector::parse(<span class="kw-2">&amp;</span>state, unit_filter) <span class="kw">else </span>{
+        <span class="kw">return </span>(
+            StatusCode::BAD_REQUEST,
+            <span class="string">"Invalid unit selector\n"</span>.to_owned(),
+        );
+    };
 
+    <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0</span>;
     state.units.send_if_modified(|units| {
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(mac) = unit_filter.parse::&lt;MacAddr6&gt;() {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.mac == mac {
-                    unit.image = image.clone();
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if let </span><span class="prelude-val">Ok</span>(ip) = unit_filter.parse::&lt;Ipv4Addr&gt;() {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.static_ip() == ip {
-                    unit.image = image.clone();
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if </span>unit_filter == <span class="string">"all" </span>{
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+        <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
+            <span class="kw">if </span>unit_selector.select(unit) {
                 unit.image = image.clone();
                 updated += <span class="number">1</span>;
             }
-        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>group) = state.config.groups.get_by_first(<span class="kw-2">&amp;</span>unit_filter) {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.group == group {
-                    unit.image = image.clone();
-                    updated += <span class="number">1</span>;
-                }
-            }
-        } <span class="kw">else if </span>state.config.images.contains(<span class="kw-2">&amp;</span>unit_filter) {
-            <span class="kw">for </span>unit <span class="kw">in </span>units.iter_mut() {
-                <span class="kw">if </span>unit.image == unit_filter {
-                    unit.image = image.clone();
-                    updated += <span class="number">1</span>;
-                }
-            }
         }
-
         updated &gt; <span class="number">0
     </span>});
 
@@ -337,10 +351,36 @@
     }
 }
 
-<span class="kw">async fn </span>gc(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; String {
-    state.gc_chunks().unwrap();
-    <span class="string">""</span>.to_owned()
+<span class="kw">async fn </span>forget(
+    Path(unit_filter): Path&lt;String&gt;,
+    extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;,
+) -&gt; <span class="kw">impl </span>IntoResponse {
+    <span class="kw">let </span><span class="prelude-val">Some</span>(unit_selector) = UnitSelector::parse(<span class="kw-2">&amp;</span>state, unit_filter) <span class="kw">else </span>{
+        <span class="kw">return </span>(
+            StatusCode::BAD_REQUEST,
+            <span class="string">"Invalid unit selector\n"</span>.to_owned(),
+        );
+    };
+
+    <span class="kw">let </span><span class="kw-2">mut </span>updated = <span class="number">0</span>;
+    state.units.send_if_modified(|units| {
+        <span class="kw">let </span>len_before = units.len();
+        units.retain(|unit| !unit_selector.select(unit));
+        updated = len_before - units.len();
+        updated &gt; <span class="number">0
+    </span>});
+
+    <span class="kw">if </span>updated &gt; <span class="number">0 </span>{
+        (StatusCode::OK, <span class="macro">format!</span>(<span class="string">"{updated} computer(s) removed\n"</span>))
+    } <span class="kw">else </span>{
+        (StatusCode::BAD_REQUEST, <span class="string">"Unknown PC\n"</span>.to_owned())
+    }
 }
+
+<span class="kw">async fn </span>gc(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; <span class="kw">impl </span>IntoResponse {
+    state.gc_chunks();
+    <span class="string">"Garbage collection completed\n"
+</span>}
 
 <span class="kw">async fn </span>status(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; <span class="kw">impl </span>IntoResponse {
     <span class="kw">let </span>initial_messages = <span class="macro">vec!</span>[
@@ -381,6 +421,7 @@
         .route(<span class="string">"/admin/gc"</span>, get(gc))
         .route(<span class="string">"/admin/action/:unit/:action"</span>, get(action))
         .route(<span class="string">"/admin/image/:unit/:image"</span>, get(image))
+        .route(<span class="string">"/admin/forget/:unit"</span>, get(forget))
         .nest_service(
             <span class="string">"/"</span>,
             ServeDir::new(<span class="kw-2">&amp;</span>admin_path).append_index_html_on_directories(<span class="bool-val">true</span>),
@@ -389,8 +430,15 @@
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
+    <span class="kw">let </span>signal_kind = tokio::signal::unix::SignalKind::terminate();
+    <span class="kw">let </span><span class="kw-2">mut </span>signal = tokio::signal::unix::signal(signal_kind)<span class="question-mark">?</span>;
+
     <span class="kw">let </span>listener = TcpListener::bind(listen_on).<span class="kw">await</span><span class="question-mark">?</span>;
-    axum::serve(listener, router).<span class="kw">await</span><span class="question-mark">?</span>;
+    axum::serve(listener, router)
+        .with_graceful_shutdown(<span class="kw">async move </span>{
+            signal.recv().<span class="kw">await</span>;
+        })
+        .<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }

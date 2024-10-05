@@ -244,9 +244,6 @@
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
 <a href="#246" id="246">246</a>
-<a href="#247" id="247">247</a>
-<a href="#248" id="248">248</a>
-<a href="#249" id="249">249</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::{BTreeMap, HashMap},
     fs::{<span class="self">self</span>, File},
@@ -401,7 +398,7 @@
         })
     }
 
-    <span class="kw">pub fn </span>gc_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">pub fn </span>gc_chunks(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.image_stats.send_modify(|image_stats| {
             <span class="kw">let </span><span class="kw-2">mut </span>chunk_stats = <span class="self">self</span>.chunk_stats.lock().unwrap();
             <span class="kw">let </span><span class="kw-2">mut </span>cnt = <span class="number">0</span>;
@@ -418,10 +415,9 @@
                 </span>}
             });
         });
-        <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>add_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, hash: ChunkHash, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">pub fn </span>add_chunk(<span class="kw-2">&amp;</span><span class="self">self</span>, hash: ChunkHash, data: <span class="kw-2">&amp;</span>[u8]) {
         <span class="kw">let </span>path = <span class="self">self</span>.storage_dir.join(<span class="string">"chunks"</span>).join(hex::encode(hash));
 
         <span class="self">self</span>.image_stats.send_modify(|image_stats| {
@@ -438,8 +434,6 @@
                 image_stats.reclaimable += data.len() <span class="kw">as </span>u64;
             }
         });
-
-        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub fn </span>add_image(<span class="kw-2">&amp;</span><span class="self">self</span>, name: String, image: Image) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -482,7 +476,7 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">pub fn </span>set_ping(<span class="kw-2">&amp;</span><span class="self">self</span>, peer_mac: MacAddr6, time: u64, message: Vec&lt;u8&gt;) {
+    <span class="kw">pub fn </span>set_unit_ping(<span class="kw-2">&amp;</span><span class="self">self</span>, peer_mac: MacAddr6, time: u64, message: Vec&lt;u8&gt;) {
         <span class="self">self</span>.units.send_if_modified(|units| {
             <span class="kw">let </span><span class="prelude-val">Some</span>(unit) = units.iter_mut().find(|unit| unit.mac == peer_mac) <span class="kw">else </span>{
                 <span class="macro">log::warn!</span>(<span class="string">"Got ping from unknown unit"</span>);
