@@ -271,7 +271,7 @@
             Vec::new()
         }
         TcpRequest::UploadChunk(hash, data) =&gt; {
-            state.add_chunk(hash, <span class="kw-2">&amp;</span>data);
+            state.add_chunk(hash, <span class="kw-2">&amp;</span>data)<span class="question-mark">?</span>;
             Vec::new()
         }
         TcpRequest::UploadImage(name, image) =&gt; {
