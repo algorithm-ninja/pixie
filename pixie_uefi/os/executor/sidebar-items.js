@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["executor"],"static":["EXECUTOR","EXECUTOR_CONSTRUCTED"],"struct":["Executor","Task","TaskInner"],"type":["BoxFuture"]};
+window.SIDEBAR_ITEMS = {"static":["EXECUTOR"],"struct":["Executor","Task","TaskInner"],"type":["BoxFuture"]};
