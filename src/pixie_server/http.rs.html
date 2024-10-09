@@ -209,10 +209,6 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a>
-<a href="#214" id="214">214</a>
-<a href="#215" id="215">215</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::Ipv4Addr, sync::Arc};
 
 <span class="kw">use </span>anyhow::Result;
@@ -376,23 +372,19 @@
 </span>}
 
 <span class="kw">async fn </span>status(extract::State(state): extract::State&lt;Arc&lt;State&gt;&gt;) -&gt; <span class="kw">impl </span>IntoResponse {
-    <span class="kw">let </span>initial_messages = <span class="macro">vec!</span>[
-        StatusUpdate::Config(state.config.clone()),
-        StatusUpdate::HostMap(state.hostmap.clone()),
-    ];
-    <span class="kw">let </span><span class="kw-2">mut </span>units_rx = state.units.subscribe();
-    units_rx.mark_changed();
-    <span class="kw">let </span>units_rx = WatchStream::new(units_rx);
+    <span class="kw">let </span>initial_messages = [StatusUpdate::Config(state.config.clone())];
 
-    <span class="kw">let </span><span class="kw-2">mut </span>image_rx = state.image_stats.subscribe();
-    image_rx.mark_changed();
-    <span class="kw">let </span>image_rx = WatchStream::new(image_rx);
+    <span class="kw">let </span>units_rx = WatchStream::new(state.units.subscribe());
+    <span class="kw">let </span>image_rx = WatchStream::new(state.image_stats.subscribe());
+    <span class="kw">let </span>hostmap_rx = WatchStream::new(state.hostmap.subscribe());
 
-    <span class="kw">let </span>messages =
-        futures::stream::iter(initial_messages.into_iter()).chain(futures::stream::select(
+    <span class="kw">let </span>messages = futures::stream::iter(initial_messages).chain(futures::stream::select(
+        futures::stream::select(
             image_rx.map(StatusUpdate::ImageStats),
             units_rx.map(StatusUpdate::Units),
-        ));
+        ),
+        hostmap_rx.map(StatusUpdate::HostMap),
+    ));
     <span class="kw">let </span>lines = messages.map(|msg| serde_json::to_string(<span class="kw-2">&amp;</span>msg).map(|x| x + <span class="string">"\n"</span>));
 
     <span class="kw">let </span><span class="kw-2">mut </span>res = Response::new(Body::from_stream(lines));

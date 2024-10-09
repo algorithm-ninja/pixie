@@ -142,6 +142,15 @@
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
 <a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>dnsmasq;
 <span class="kw">mod </span>http;
 <span class="kw">mod </span>ping;
@@ -270,6 +279,15 @@
     }
 
     <span class="kw">let </span>state = Arc::new(State::load(options.storage_dir)<span class="question-mark">?</span>);
+
+    <span class="kw">let </span>state2 = state.clone();
+    tokio::spawn(<span class="kw">async move </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::hangup())
+            .expect(<span class="string">"failed to register signal handler"</span>);
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(()) = signal.recv().<span class="kw">await </span>{
+            state2.reload().unwrap();
+        }
+    });
 
     <span class="kw">async fn </span>flatten(task: JoinHandle&lt;<span class="prelude-ty">Result</span>&lt;()&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         task.<span class="kw">await</span><span class="question-mark">??</span>;

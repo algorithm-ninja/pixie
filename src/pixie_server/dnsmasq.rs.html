@@ -143,7 +143,17 @@
 <a href="#143" id="143">143</a>
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
+    collections::HashMap,
     fs::File,
     io::{BufWriter, Error, Write},
     net::Ipv4Addr,
@@ -244,13 +254,16 @@ dhcp-vendorclass=set:netboot,pixie
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn </span>get_hosts(state: <span class="kw-2">&amp;</span>State, units: <span class="kw-2">&amp;</span>[Unit]) -&gt; Vec&lt;(MacAddr6, Ipv4Addr, <span class="prelude-ty">Option</span>&lt;String&gt;)&gt; {
+<span class="kw">fn </span>get_hosts(
+    hostmap: <span class="kw-2">&amp;</span>HashMap&lt;Ipv4Addr, String&gt;,
+    units: <span class="kw-2">&amp;</span>[Unit],
+) -&gt; Vec&lt;(MacAddr6, Ipv4Addr, <span class="prelude-ty">Option</span>&lt;String&gt;)&gt; {
     units
         .iter()
         .map(|unit| {
             <span class="kw">let </span>mac = unit.mac;
             <span class="kw">let </span>ip = unit.static_ip();
-            <span class="kw">let </span>hostname = state.hostmap.get(<span class="kw-2">&amp;</span>ip).cloned();
+            <span class="kw">let </span>hostname = hostmap.get(<span class="kw-2">&amp;</span>ip).cloned();
             (mac, ip, hostname)
         })
         .collect()
@@ -258,9 +271,13 @@ dhcp-vendorclass=set:netboot,pixie
 
 <span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>units_rx = state.units.subscribe();
+    <span class="kw">let </span><span class="kw-2">mut </span>hostmap_rx = state.hostmap.subscribe();
 
     write_config(<span class="kw-2">&amp;</span>state).<span class="kw">await</span><span class="question-mark">?</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>hosts = get_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
+    <span class="kw">let </span><span class="kw-2">mut </span>hosts = get_hosts(
+        <span class="kw-2">&amp;</span>hostmap_rx.borrow_and_update(),
+        <span class="kw-2">&amp;</span>units_rx.borrow_and_update(),
+    );
     write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="kw">let </span>dnsmasq = DnsmasqHandle {
@@ -277,14 +294,15 @@ dhcp-vendorclass=set:netboot,pixie
 
     <span class="kw">loop </span>{
         <span class="macro">tokio::select!</span> {
-            <span class="kw">_ </span>= units_rx.changed() =&gt; {
-                <span class="kw">let </span>hosts2 = get_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
-                <span class="kw">if </span>hosts != hosts2 {
-                    hosts = hosts2;
-                    write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
-                    dnsmasq.reload()<span class="question-mark">?</span>;
-                }
-            }
+            ret = units_rx.changed() =&gt; ret.unwrap(),
+            ret = hostmap_rx.changed() =&gt; ret.unwrap(),
+        }
+
+        <span class="kw">let </span>hosts2 = get_hosts(<span class="kw-2">&amp;</span>hostmap_rx.borrow_and_update(), <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
+        <span class="kw">if </span>hosts != hosts2 {
+            hosts = hosts2;
+            write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
+            dnsmasq.reload()<span class="question-mark">?</span>;
         }
     }
 }
