@@ -209,6 +209,9 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{net::Ipv4Addr, sync::Arc};
 
 <span class="kw">use </span>anyhow::Result;
@@ -387,10 +390,12 @@
     ));
     <span class="kw">let </span>lines = messages.map(|msg| serde_json::to_string(<span class="kw-2">&amp;</span>msg).map(|x| x + <span class="string">"\n"</span>));
 
-    <span class="kw">let </span><span class="kw-2">mut </span>res = Response::new(Body::from_stream(lines));
-    res.headers_mut()
-        .insert(<span class="string">"Content-Type"</span>, <span class="string">"application/json"</span>.parse().unwrap());
-    res
+    Response::builder()
+        .header(<span class="string">"Content-Type"</span>, <span class="string">"application/json"</span>)
+        .header(<span class="string">"Cache-Control"</span>, <span class="string">"no-cache"</span>)
+        .header(<span class="string">"X-Accel-Buffering"</span>, <span class="string">"no"</span>)
+        .body(Body::from_stream(lines))
+        .unwrap()
 }
 
 <span class="kw">pub async fn </span>main(state: Arc&lt;State&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
@@ -401,7 +406,7 @@
 
     <span class="kw">let </span>admin_path = state.storage_dir.join(<span class="string">"admin"</span>);
 
-    <span class="kw">let </span>router = Router::new()
+    <span class="kw">let </span><span class="kw-2">mut </span>router = Router::new()
         .route(<span class="string">"/admin/status"</span>, get(status))
         .route(<span class="string">"/admin/gc"</span>, get(gc))
         .route(<span class="string">"/admin/action/:unit/:action"</span>, get(action))
@@ -410,13 +415,14 @@
         .nest_service(
             <span class="string">"/"</span>,
             ServeDir::new(<span class="kw-2">&amp;</span>admin_path).append_index_html_on_directories(<span class="bool-val">true</span>),
-        )
-        .layer(ValidateRequestHeaderLayer::basic(<span class="string">"admin"</span>, password))
-        .layer(TraceLayer::new_for_http())
-        .with_state(state);
+        );
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(password) = password {
+        router = router.layer(ValidateRequestHeaderLayer::basic(<span class="string">"admin"</span>, password));
+    }
+    router = router.layer(TraceLayer::new_for_http());
 
     <span class="kw">let </span>listener = TcpListener::bind(listen_on).<span class="kw">await</span><span class="question-mark">?</span>;
-    axum::serve(listener, router).<span class="kw">await</span><span class="question-mark">?</span>;
+    axum::serve(listener, router.with_state(state)).<span class="kw">await</span><span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
 }

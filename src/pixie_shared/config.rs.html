@@ -133,7 +133,7 @@
 <span class="attr">#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>HttpConfig {
     <span class="kw">pub </span>listen_on: SocketAddrV4,
-    <span class="kw">pub </span>password: String,
+    <span class="kw">pub </span>password: <span class="prelude-ty">Option</span>&lt;String&gt;,
 }
 
 <span class="attr">#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
