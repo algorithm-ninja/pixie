@@ -152,6 +152,9 @@
 <a href="#152" id="152">152</a>
 <a href="#153" id="153">153</a>
 <a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::HashMap,
     fs::File,
@@ -298,7 +301,10 @@ dhcp-vendorclass=set:netboot,pixie
             ret = hostmap_rx.changed() =&gt; ret.unwrap(),
         }
 
-        <span class="kw">let </span>hosts2 = get_hosts(<span class="kw-2">&amp;</span>hostmap_rx.borrow_and_update(), <span class="kw-2">&amp;</span>units_rx.borrow_and_update());
+        <span class="kw">let </span>hosts2 = get_hosts(
+            <span class="kw-2">&amp;</span>hostmap_rx.borrow_and_update(),
+            <span class="kw-2">&amp;</span>units_rx.borrow_and_update(),
+        );
         <span class="kw">if </span>hosts != hosts2 {
             hosts = hosts2;
             write_hosts(<span class="kw-2">&amp;</span>state, <span class="kw-2">&amp;</span>hosts).<span class="kw">await</span><span class="question-mark">?</span>;
